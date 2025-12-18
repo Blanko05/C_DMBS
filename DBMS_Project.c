@@ -132,44 +132,97 @@ typedef struct
 */
 void SystemUI();
 DLL *InitalizeList();
+void Insert(DLL *list, void *data);
+void Delete(DLL *list, Node *node);
 HashTable *InitalizeTable();
 void LoadData();
 void SaveData();
 void InitalizeBuffer();
 int Hash(char *str);
 
-void InsertUser(DLL *list, User *newUser);
 void PrintAllUsers();
 User *FindUser(DLL *list, char *id);
 void PrintUser(User *user);
 void DeleteUser(DLL *list, char *id);
 
-void InsertUserHash(HashTable *ht, User *u);
-User *FindUserHash(HashTable *ht, char *str);
-void DeleteUserHash(HashTable *ht, char *str);
+void InsertUserHash(User *u);
+User *FindUserHash(char *str);
+void DeleteUserHash(char *str);
 
 void LoadUsers(char *filename);
 User *ParseUserLine(char *line);
 void SaveUsers(char *filename);
 
-void InsertVehicle(DLL *list, Vehicle *newVehicle);
 void PrintAllVehicles();
 Vehicle *FindVehicle(DLL *list, char *licensePlate);
 void PrintVehicle(Vehicle *vehicle);
 void DeleteVehicle(DLL *list, char *licensePlate);
 
-void InsertVehicleHash(HashTable *ht, Vehicle *v);
-Vehicle *FindVehicleHash(HashTable *ht, char *str);
-void DeleteVehicleHash(HashTable *ht, char *str);
+void InsertVehicleHash(Vehicle *v);
+Vehicle *FindVehicleHash(char *str);
+void DeleteVehicleHash(char *str);
 
-void DeleteVehiclesOwnedByUser(HashTable *ht, char *str);
+void DeleteVehiclesOwnedByUser(char *str);
 
 void LoadVehicles(char *filename);
 Vehicle *ParseVehicleLine(char *line);
 void SaveVehicles(char *filename);
 
+void PrintAllGates();
+Gate *FindGate(DLL *list, char *id);
+void PrintGate(Gate *gate);
+void DeleteGate(DLL *list, char *id);
+
+void InsertGateHash(Gate *g);
+Gate *FindGateHash(char *str);
+void DeleteGateHash(char *str);
+
+void LoadGates(char *filename);
+Gate *ParseGateLine(char *line);
+void SaveGates(char *filename);
+
+void PrintAllZones();
+Zone *FindZone(DLL *list, char *id);
+void PrintZone(Zone *zone);
+void DeleteZone(DLL *list, char *id);
+
+void InsertZoneHash(Zone *z);
+Zone *FindZoneHash(char *str);
+void DeleteZoneHash(char *str);
+
+void LoadZones(char *filename);
+Zone *ParseZoneLine(char *line);
+void SaveZones(char *filename);
+
+void PrintAllRoles();
+Role *FindRole(DLL *list, char *id);
+void PrintRole(Role *role);
+void DeleteRole(DLL *list, char *id);
+
+void InsertRoleHash(Role *r);
+Role *FindRoleHash(char *str);
+void DeleteRoleHash(char *str);
+
+void LoadRoles(char *filename);
+Role *ParseRoleLine(char *line);
+void SaveRoles(char *filename);
+
+void InsertGate_ZoneHash(Gate_Zone *gz);
+Gate_Zone *FindGateZoneLink(char *gateID, char *zoneID);
+void DeleteGateZonesByGateID(char *gateID);
+void DeleteGateZonesByZoneID(char *zoneID);
+DLL *GetGateZoneBucket(char *gateID);
+
+void LoadGate_Zone(char *filename);
+Gate_Zone *ParseGate_ZoneLine(char *line);
+void SaveGateZone(char *filename);
+
 HashTable *UserTable = NULL;
 HashTable *VehicleTable = NULL;
+HashTable *GateTable = NULL;
+HashTable *ZoneTable = NULL;
+HashTable *RoleTable = NULL;
+HashTable *Gate_ZoneTable = NULL;
 int main()
 {
     InitalizeBuffer();
@@ -191,10 +244,10 @@ DLL *InitalizeList()
     return list;
 }
 
-void InsertUser(DLL *list, User *newUser)
+void Insert(DLL *list, void *data)
 {
     Node *newNode = calloc(1, sizeof(Node));
-    newNode->data = (void *)newUser;
+    newNode->data = data;
     newNode->next = NULL;
     newNode->prev = NULL;
 
@@ -211,26 +264,51 @@ void InsertUser(DLL *list, User *newUser)
     list->size++;
     return;
 }
-void InsertVehicle(DLL *list, Vehicle *newVehicle)
+void Delete(DLL *list, Node *node)
 {
-    Node *newNode = calloc(1, sizeof(Node));
-    newNode->data = (void *)newVehicle;
-    newNode->next = NULL;
-    newNode->prev = NULL;
-
     if (list->head == NULL)
     {
-        list->head = newNode;
-        list->tail = newNode;
-        list->size++;
         return;
     }
-    list->tail->next = newNode;
-    newNode->prev = list->tail;
-    list->tail = newNode;
-    list->size++;
-    return;
+    Node *temp = list->head;
+    while (temp != NULL)
+    {
+        if (temp == node)
+        {
+
+            if (temp == list->head)
+            {
+                if (temp->next != NULL)
+                {
+                    list->head = temp->next;
+                    list->head->prev = NULL;
+                }
+                else
+                {
+                    list->head = NULL;
+                    list->tail = NULL;
+                }
+            }
+
+            else if (temp->next != NULL)
+            {
+                temp->prev->next = temp->next;
+                temp->next->prev = temp->prev;
+            }
+            else
+            {
+                list->tail = temp->prev;
+                list->tail->next = NULL;
+            }
+            list->size--;
+            free(temp->data);
+            free(temp);
+            return;
+        }
+        temp = temp->next;
+    }
 }
+
 void PrintAllUsers()
 {
     for (int i = 0; i < Table_Size; i++)
@@ -240,6 +318,48 @@ void PrintAllUsers()
         {
             User *u = (User *)temp->data;
             PrintUser(u);
+            temp = temp->next;
+        }
+    }
+    return;
+}
+void PrintAllRoles()
+{
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *temp = RoleTable->buckets[i]->head;
+        while (temp != NULL)
+        {
+            Role *r = (Role *)temp->data;
+            PrintRole(r);
+            temp = temp->next;
+        }
+    }
+    return;
+}
+void PrintAllZones()
+{
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *temp = ZoneTable->buckets[i]->head;
+        while (temp != NULL)
+        {
+            Zone *z = (Zone *)temp->data;
+            PrintZone(z);
+            temp = temp->next;
+        }
+    }
+    return;
+}
+void PrintAllGates()
+{
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *temp = GateTable->buckets[i]->head;
+        while (temp != NULL)
+        {
+            Gate *g = (Gate *)temp->data;
+            PrintGate(g);
             temp = temp->next;
         }
     }
@@ -270,6 +390,60 @@ User *FindUser(DLL *list, char *id)
     {
         User *current = (User *)temp->data;
         if (!strcmp(current->User_ID, id))
+        {
+            return current;
+        }
+        temp = temp->next;
+    }
+    return NULL;
+}
+Role *FindRole(DLL *list, char *id)
+{
+    if (list->head == NULL)
+    {
+        return NULL;
+    }
+    Node *temp = list->head;
+    while (temp != NULL)
+    {
+        Role *current = (Role *)temp->data;
+        if (!strcmp(current->Role_ID, id))
+        {
+            return current;
+        }
+        temp = temp->next;
+    }
+    return NULL;
+}
+Zone *FindZone(DLL *list, char *id)
+{
+    if (list->head == NULL)
+    {
+        return NULL;
+    }
+    Node *temp = list->head;
+    while (temp != NULL)
+    {
+        Zone *current = (Zone *)temp->data;
+        if (!strcmp(current->Zone_ID, id))
+        {
+            return current;
+        }
+        temp = temp->next;
+    }
+    return NULL;
+}
+Gate *FindGate(DLL *list, char *id)
+{
+    if (list->head == NULL)
+    {
+        return NULL;
+    }
+    Node *temp = list->head;
+    while (temp != NULL)
+    {
+        Gate *current = (Gate *)temp->data;
+        if (!strcmp(current->Gate_ID, id))
         {
             return current;
         }
@@ -318,6 +492,37 @@ void PrintUser(User *user)
     }
     return;
 }
+void PrintRole(Role *role)
+{
+    printf("RoleID: %s\n", role->Role_ID[0] != '\0' ? role->Role_ID : "N/A");
+    printf("Name: %s\n", role->RoleName[0] != '\0' ? role->RoleName : "N/A");
+    printf("description: %s\n", role->RoleDescription[0] != '\0' ? role->RoleDescription : "N/A");
+    return;
+}
+void PrintZone(Zone *zone)
+{
+    printf("ZoneID: %s\n", zone->Zone_ID[0] != '\0' ? zone->Zone_ID : "N/A");
+    printf("Name: %s\n", zone->ZoneName[0] != '\0' ? zone->ZoneName : "N/A");
+    return;
+}
+void PrintGate(Gate *gate)
+{
+    printf("GateID: %s\n", gate->Gate_ID[0] != '\0' ? gate->Gate_ID : "N/A");
+    printf("Name: %s\n", gate->gateName[0] != '\0' ? gate->gateName : "N/A");
+    switch (gate->gateStatus)
+    {
+    case 0:
+        printf("Gate Status: Active\n");
+        break;
+    case 1:
+        printf("Gate Status: Closed\n");
+        break;
+    case 2:
+        printf("Gate Status: Maintenance\n");
+        break;
+    }
+    return;
+}
 void PrintVehicle(Vehicle *vehicle)
 {
     printf("License Plate: %s\n", vehicle->License_Plate[0] != '\0' ? vehicle->License_Plate : "N/A");
@@ -349,6 +554,141 @@ void DeleteUser(DLL *list, char *id)
     {
         User *current = (User *)temp->data;
         if (!strcmp(current->User_ID, id))
+        {
+
+            if (temp == list->head)
+            {
+                if (temp->next != NULL)
+                {
+                    list->head = temp->next;
+                    list->head->prev = NULL;
+                }
+                else
+                {
+                    list->head = NULL;
+                    list->tail = NULL;
+                }
+            }
+
+            else if (temp->next != NULL)
+            {
+                temp->prev->next = temp->next;
+                temp->next->prev = temp->prev;
+            }
+            else
+            {
+                list->tail = temp->prev;
+                list->tail->next = NULL;
+            }
+            list->size--;
+            free(current);
+            free(temp);
+            return;
+        }
+        temp = temp->next;
+    }
+}
+void DeleteRole(DLL *list, char *id)
+{
+    if (list->head == NULL)
+    {
+        return;
+    }
+    Node *temp = list->head;
+    while (temp != NULL)
+    {
+        Role *current = (Role *)temp->data;
+        if (!strcmp(current->Role_ID, id))
+        {
+
+            if (temp == list->head)
+            {
+                if (temp->next != NULL)
+                {
+                    list->head = temp->next;
+                    list->head->prev = NULL;
+                }
+                else
+                {
+                    list->head = NULL;
+                    list->tail = NULL;
+                }
+            }
+
+            else if (temp->next != NULL)
+            {
+                temp->prev->next = temp->next;
+                temp->next->prev = temp->prev;
+            }
+            else
+            {
+                list->tail = temp->prev;
+                list->tail->next = NULL;
+            }
+            list->size--;
+            free(current);
+            free(temp);
+            return;
+        }
+        temp = temp->next;
+    }
+}
+void DeleteZone(DLL *list, char *id)
+{
+    if (list->head == NULL)
+    {
+        return;
+    }
+    Node *temp = list->head;
+    while (temp != NULL)
+    {
+        Zone *current = (Zone *)temp->data;
+        if (!strcmp(current->Zone_ID, id))
+        {
+
+            if (temp == list->head)
+            {
+                if (temp->next != NULL)
+                {
+                    list->head = temp->next;
+                    list->head->prev = NULL;
+                }
+                else
+                {
+                    list->head = NULL;
+                    list->tail = NULL;
+                }
+            }
+
+            else if (temp->next != NULL)
+            {
+                temp->prev->next = temp->next;
+                temp->next->prev = temp->prev;
+            }
+            else
+            {
+                list->tail = temp->prev;
+                list->tail->next = NULL;
+            }
+            list->size--;
+            free(current);
+            free(temp);
+            return;
+        }
+        temp = temp->next;
+    }
+}
+void DeleteGate(DLL *list, char *id)
+{
+    if (list->head == NULL)
+    {
+        return;
+    }
+    Node *temp = list->head;
+    while (temp != NULL)
+    {
+        Gate *current = (Gate *)temp->data;
+        if (!strcmp(current->Gate_ID, id))
         {
 
             if (temp == list->head)
@@ -448,11 +788,92 @@ void LoadUsers(char *filename)
 
         if (newUser != NULL)
         {
-            InsertUserHash(UserTable, newUser);
+            InsertUserHash(newUser);
         }
     }
     fclose(file);
     printf("loaded Users successfully!\n");
+    return;
+}
+void LoadRoles(char *filename)
+{
+    FILE *file = fopen(filename, "r");
+    if (file == NULL)
+    {
+        printf("Couldn't open file: %s\n", filename);
+        return;
+    }
+    char line[Buffer_Size];
+
+    fgets(line, Buffer_Size, file); // skip header line
+
+    while (fgets(line, Buffer_Size, file) != NULL)
+    {
+        line[strcspn(line, "\n")] = 0;
+
+        Role *newRole = ParseRoleLine(line);
+
+        if (newRole != NULL)
+        {
+            InsertRoleHash(newRole);
+        }
+    }
+    fclose(file);
+    printf("loaded Roles successfully!\n");
+    return;
+}
+void LoadZones(char *filename)
+{
+    FILE *file = fopen(filename, "r");
+    if (file == NULL)
+    {
+        printf("Couldn't open file: %s\n", filename);
+        return;
+    }
+    char line[Buffer_Size];
+
+    fgets(line, Buffer_Size, file); // skip header line
+
+    while (fgets(line, Buffer_Size, file) != NULL)
+    {
+        line[strcspn(line, "\n")] = 0;
+
+        Zone *newZone = ParseZoneLine(line);
+
+        if (newZone != NULL)
+        {
+            InsertZoneHash(newZone);
+        }
+    }
+    fclose(file);
+    printf("loaded Zones successfully!\n");
+    return;
+}
+void LoadGates(char *filename)
+{
+    FILE *file = fopen(filename, "r");
+    if (file == NULL)
+    {
+        printf("Couldn't open file: %s\n", filename);
+        return;
+    }
+    char line[Buffer_Size];
+
+    fgets(line, Buffer_Size, file); // skip header line
+
+    while (fgets(line, Buffer_Size, file) != NULL)
+    {
+        line[strcspn(line, "\n")] = 0;
+
+        Gate *newGate = ParseGateLine(line);
+
+        if (newGate != NULL)
+        {
+            InsertGateHash(newGate);
+        }
+    }
+    fclose(file);
+    printf("loaded Gates successfully!\n");
     return;
 }
 void LoadVehicles(char *filename)
@@ -475,9 +896,9 @@ void LoadVehicles(char *filename)
 
         if (newVehicle != NULL)
         {
-            if (FindUserHash(UserTable, newVehicle->USER_ID) != NULL)
+            if (FindUserHash(newVehicle->USER_ID) != NULL)
             {
-                InsertVehicleHash(VehicleTable, newVehicle);
+                InsertVehicleHash(newVehicle);
             }
             else
             {
@@ -529,6 +950,61 @@ User *ParseUserLine(char *line)
 
     return u;
 }
+Zone *ParseZoneLine(char *line)
+{
+    Zone *z = calloc(1, sizeof(Zone));
+    if (z == NULL)
+        return NULL;
+
+    char *token;
+
+    token = strtok(line, ",");
+    if (token)
+        strcpy(z->Zone_ID, token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(z->ZoneName, token);
+    return z;
+}
+Role *ParseRoleLine(char *line)
+{
+    Role *r = calloc(1, sizeof(Role));
+    if (r == NULL)
+        return NULL;
+
+    char *token;
+
+    token = strtok(line, ",");
+    if (token)
+        strcpy(r->Role_ID, token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(r->RoleName, token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(r->RoleDescription, token);
+    return r;
+}
+Gate *ParseGateLine(char *line)
+{
+    Gate *g = calloc(1, sizeof(Gate));
+    if (g == NULL)
+        return NULL;
+
+    char *token;
+
+    token = strtok(line, ",");
+    if (token)
+        strcpy(g->Gate_ID, token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(g->gateName, token);
+    token = strtok(NULL, ",");
+    if (token)
+        g->gateStatus = atoi(token);
+    return g;
+}
+
 Vehicle *ParseVehicleLine(char *line)
 {
     Vehicle *v = calloc(1, sizeof(Vehicle));
@@ -583,6 +1059,83 @@ void SaveUsers(char *filename)
                     u->ExpiryDate,
                     u->ORG_ID,
                     u->ROLE_ID);
+            temp = temp->next;
+        }
+    }
+
+    fclose(file);
+    printf("Data Saved Succcessfully to %s\n", filename);
+}
+void SaveGates(char *filename)
+{
+    FILE *file = fopen(filename, "w");
+    if (file == NULL)
+    {
+        printf("Couldn't open FIle: %s for Writing\n", filename);
+        return;
+    }
+    fprintf(file, "Gate_ID,gateName,gateStatus\n");
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *temp = GateTable->buckets[i]->head;
+        while (temp != NULL)
+        {
+            Gate *g = (Gate *)temp->data;
+            fprintf(file, "%s,%s,%d\n",
+                    g->Gate_ID,
+                    g->gateName,
+                    g->gateStatus);
+            temp = temp->next;
+        }
+    }
+
+    fclose(file);
+    printf("Data Saved Succcessfully to %s\n", filename);
+}
+void SaveZones(char *filename)
+{
+    FILE *file = fopen(filename, "w");
+    if (file == NULL)
+    {
+        printf("Couldn't open FIle: %s for Writing\n", filename);
+        return;
+    }
+    fprintf(file, "Zone_ID,zoneName\n");
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *temp = ZoneTable->buckets[i]->head;
+        while (temp != NULL)
+        {
+            Zone *z = (Zone *)temp->data;
+            fprintf(file, "%s,%s\n",
+                    z->Zone_ID,
+                    z->ZoneName);
+            temp = temp->next;
+        }
+    }
+
+    fclose(file);
+    printf("Data Saved Succcessfully to %s\n", filename);
+}
+void SaveRoles(char *filename)
+{
+    FILE *file = fopen(filename, "w");
+    if (file == NULL)
+    {
+        printf("Couldn't open FIle: %s for Writing\n", filename);
+        return;
+    }
+    fprintf(file, "Role_ID,RoleName,RoleDescription\n");
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *temp = RoleTable->buckets[i]->head;
+        while (temp != NULL)
+        {
+            Role *r = (Role *)temp->data;
+            fprintf(file, "%s,%s,%s\n",
+                    r->Role_ID,
+                    r->RoleName,
+                    r->RoleDescription);
             temp = temp->next;
         }
     }
@@ -660,49 +1213,102 @@ HashTable *InitalizeTable()
     }
     return table;
 }
-void InsertUserHash(HashTable *ht, User *u)
+void InsertUserHash(User *u)
 {
     int index = Hash(u->User_ID);
-    InsertUser(ht->buckets[index], u);
+    Insert(UserTable->buckets[index], u);
     return;
 }
-void InsertVehicleHash(HashTable *ht, Vehicle *v)
+void InsertRoleHash(Role *r)
+{
+    int index = Hash(r->Role_ID);
+    Insert(RoleTable->buckets[index], r);
+    return;
+}
+void InsertGateHash(Gate *g)
+{
+    int index = Hash(g->Gate_ID);
+    Insert(GateTable->buckets[index], g);
+    return;
+}
+void InsertZoneHash(Zone *z)
+{
+    int index = Hash(z->Zone_ID);
+    Insert(ZoneTable->buckets[index], z);
+}
+void InsertVehicleHash(Vehicle *v)
 {
     int index = Hash(v->License_Plate);
-    InsertVehicle(ht->buckets[index], v);
+    Insert(VehicleTable->buckets[index], v);
     return;
 }
-User *FindUserHash(HashTable *ht, char *str)
+User *FindUserHash(char *str)
 {
     int index = Hash(str);
-    User *u = FindUser(ht->buckets[index], str);
+    User *u = FindUser(UserTable->buckets[index], str);
     return u;
 }
-Vehicle *FindVehicleHash(HashTable *ht, char *str)
+Role *FindRoleHash(char *str)
 {
     int index = Hash(str);
-    Vehicle *v = FindVehicle(ht->buckets[index], str);
+    Role *r = FindRole(RoleTable->buckets[index], str);
+    return r;
+}
+Zone *FindZoneHash(char *str)
+{
+    int index = Hash(str);
+    Zone *z = FindZone(ZoneTable->buckets[index], str);
+    return z;
+}
+Gate *FindGateHash(char *str)
+{
+    int index = Hash(str);
+    Gate *g = FindGate(GateTable->buckets[index], str);
+    return g;
+}
+Vehicle *FindVehicleHash(char *str)
+{
+    int index = Hash(str);
+    Vehicle *v = FindVehicle(VehicleTable->buckets[index], str);
     return v;
 }
-void DeleteUserHash(HashTable *ht, char *str)
+void DeleteUserHash(char *str)
 {
-    DeleteVehiclesOwnedByUser(VehicleTable, str);
+    DeleteVehiclesOwnedByUser(str);
     int index = Hash(str);
-    DeleteUser(ht->buckets[index], str);
+    DeleteUser(UserTable->buckets[index], str);
     return;
 }
-void DeleteVehicleHash(HashTable *ht, char *str)
+void DeleteRoleHash(char *str)
 {
     int index = Hash(str);
-    DeleteVehicle(ht->buckets[index], str);
+    DeleteRole(RoleTable->buckets[index], str);
     return;
 }
-void DeleteVehiclesOwnedByUser(HashTable *ht, char *str)
+void DeleteZoneHash(char *str)
+{
+    int index = Hash(str);
+    DeleteZone(ZoneTable->buckets[index], str);
+    return;
+}
+void DeleteGateHash(char *str)
+{
+    int index = Hash(str);
+    DeleteGate(GateTable->buckets[index], str);
+    return;
+}
+void DeleteVehicleHash(char *str)
+{
+    int index = Hash(str);
+    DeleteVehicle(VehicleTable->buckets[index], str);
+    return;
+}
+void DeleteVehiclesOwnedByUser(char *str)
 {
 
     for (int i = 0; i < Table_Size; i++)
     {
-        DLL *list = ht->buckets[i];
+        DLL *list = VehicleTable->buckets[i];
         Node *current = list->head;
         while (current != NULL)
         {
@@ -710,7 +1316,7 @@ void DeleteVehiclesOwnedByUser(HashTable *ht, char *str)
             Node *nextNode = current->next;
             if (!strcmp(v->USER_ID, str))
             {
-                DeleteVehicleHash(VehicleTable, v->License_Plate);
+                DeleteVehicleHash(v->License_Plate);
             }
             current = nextNode;
         }
@@ -718,20 +1324,174 @@ void DeleteVehiclesOwnedByUser(HashTable *ht, char *str)
     return;
 }
 
+void InsertGate_ZoneHash(Gate_Zone *gz)
+{
+    int index = Hash(gz->GATE_ID);
+    if (FindGateZoneLink(gz->GATE_ID, gz->ZONE_ID) == NULL)
+        Insert(Gate_ZoneTable->buckets[index], gz);
+    return;
+}
+Gate_Zone *FindGateZoneLink(char *gateID, char *zoneID)
+{
+    int index = Hash(gateID);
+    Node *current = Gate_ZoneTable->buckets[index]->head;
+    if (current == NULL)
+        return NULL;
+    while (current != NULL)
+    {
+        Gate_Zone *gz = (Gate_Zone *)current->data;
+        if (!strcmp(gz->GATE_ID, gateID) && !strcmp(gz->ZONE_ID, zoneID))
+        {
+            return gz;
+        }
+        current = current->next;
+    }
+    return NULL;
+}
+void DeleteGateZonesByGateID(char *gateID)
+{
+    int index = Hash(gateID);
+    Node *current = Gate_ZoneTable->buckets[index]->head;
+    while (current != NULL)
+    {
+        Node *nextNode = current->next;
+        Gate_Zone *gt = (Gate_Zone *)current->data;
+        if (!strcmp(gt->GATE_ID, gateID))
+        {
+            Delete(Gate_ZoneTable->buckets[index], current);
+        }
+        current = nextNode;
+    }
+    return;
+}
+void DeleteGateZonesByZoneID(char *zoneID)
+{
+
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *current = Gate_ZoneTable->buckets[i]->head;
+        while (current != NULL)
+        {
+            Node *nextNode = current->next;
+            Gate_Zone *gt = current->data;
+            if (!strcmp(gt->ZONE_ID, zoneID))
+            {
+                Delete(Gate_ZoneTable->buckets[i], current);
+            }
+            current = nextNode;
+        }
+    }
+    return;
+}
+DLL *GetGateZoneBucket(char *gateID)
+{
+    int index = Hash(gateID);
+    return Gate_ZoneTable->buckets[index];
+}
+void LoadGate_Zone(char *filename)
+{
+    FILE *file = fopen(filename, "r");
+    if (file == NULL)
+    {
+        printf("Couldn't open file: %s\n", filename);
+        return;
+    }
+    char line[Buffer_Size];
+
+    fgets(line, Buffer_Size, file); // skip header line
+
+    while (fgets(line, Buffer_Size, file) != NULL)
+    {
+        line[strcspn(line, "\n")] = 0;
+
+        Gate_Zone *newGateZone = ParseGate_ZoneLine(line);
+
+        if (newGateZone != NULL)
+        {
+            if (FindGateHash(newGateZone->GATE_ID) != NULL && FindZoneHash(newGateZone->ZONE_ID) != NULL)
+            {
+                InsertGate_ZoneHash(newGateZone);
+            }
+            else
+            {
+                printf("Invalid Gate_Zone link: %s, %s. DELETED\n", newGateZone->GATE_ID, newGateZone->ZONE_ID);
+                free(newGateZone);
+            }
+        }
+    }
+    fclose(file);
+    printf("loaded Gates_Zones successfully!\n");
+    return;
+}
+Gate_Zone *ParseGate_ZoneLine(char *line)
+{
+    Gate_Zone *gt = calloc(1, sizeof(Gate_Zone));
+    if (gt == NULL)
+        return NULL;
+
+    char *token;
+    token = strtok(line, ",");
+    if (token)
+        strcpy(gt->GATE_ID, token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(gt->ZONE_ID, token);
+
+    return gt;
+}
+void SaveGateZone(char *filename)
+{
+    FILE *file = fopen(filename, "w");
+    if (file == NULL)
+    {
+        printf("Couldn't open FIle: %s for Writing\n", filename);
+        return;
+    }
+    fprintf(file, "Gate_ID,Zone_ID\n");
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *temp = Gate_ZoneTable->buckets[i]->head;
+        while (temp != NULL)
+        {
+            Gate_Zone *gt = (Gate_Zone *)temp->data;
+            fprintf(file, "%s,%s\n",
+                    gt->GATE_ID,
+                    gt->ZONE_ID);
+            temp = temp->next;
+        }
+    }
+
+    fclose(file);
+    printf("Data Saved Succcessfully to %s\n", filename);
+}
+
 void InitalizeBuffer()
 {
     UserTable = InitalizeTable();
     VehicleTable = InitalizeTable();
+    ZoneTable = InitalizeTable();
+    RoleTable = InitalizeTable();
+    GateTable = InitalizeTable();
+    Gate_ZoneTable = InitalizeTable();
     return;
 }
 void LoadData()
 {
     LoadUsers("UsersFile.csv");
     LoadVehicles("VehiclesFile.csv");
+    LoadGates("GatesFile.csv");
+    LoadRoles("RolesFile.csv");
+    LoadZones("ZonesFile.csv");
+    LoadGate_Zone("Gate_ZoneFile.csv");
     return;
 }
 void SaveData()
 {
     SaveUsers("UsersFile.csv");
     SaveVehicles("VehiclesFile.csv");
+    SaveGates("GatesFile.csv");
+    SaveRoles("RolesFile.csv");
+    SaveZones("ZonesFile.csv");
+    SaveGateZone("Gate_ZoneFile.csv");
+    return;
 }
