@@ -133,6 +133,9 @@ typedef struct
 void SystemUI();
 DLL *InitalizeList();
 HashTable *InitalizeTable();
+void LoadData();
+void SaveData();
+void InitalizeBuffer();
 int Hash(char *str);
 
 void InsertUser(DLL *list, User *newUser);
@@ -149,16 +152,32 @@ void LoadUsers(char *filename);
 User *ParseUserLine(char *line);
 void SaveUsers(char *filename);
 
-HashTable *UserTable = NULL;
+void InsertVehicle(DLL *list, Vehicle *newVehicle);
+void PrintAllVehicles();
+Vehicle *FindVehicle(DLL *list, char *licensePlate);
+void PrintVehicle(Vehicle *vehicle);
+void DeleteVehicle(DLL *list, char *licensePlate);
 
+void InsertVehicleHash(HashTable *ht, Vehicle *v);
+Vehicle *FindVehicleHash(HashTable *ht, char *str);
+void DeleteVehicleHash(HashTable *ht, char *str);
+
+void DeleteVehiclesOwnedByUser(HashTable *ht, char *str);
+
+void LoadVehicles(char *filename);
+Vehicle *ParseVehicleLine(char *line);
+void SaveVehicles(char *filename);
+
+HashTable *UserTable = NULL;
+HashTable *VehicleTable = NULL;
 int main()
 {
-    UserTable = InitalizeTable();
-    LoadUsers("C:/Users/Mohammed Almuhaisen/Desktop/UsersFile.csv");
+    InitalizeBuffer();
+    LoadData();
 
     SystemUI();
 
-    SaveUsers("C:/Users/Mohammed Almuhaisen/Desktop/UsersFile.csv");
+    SaveData();
 
     return 0;
 }
@@ -192,6 +211,26 @@ void InsertUser(DLL *list, User *newUser)
     list->size++;
     return;
 }
+void InsertVehicle(DLL *list, Vehicle *newVehicle)
+{
+    Node *newNode = calloc(1, sizeof(Node));
+    newNode->data = (void *)newVehicle;
+    newNode->next = NULL;
+    newNode->prev = NULL;
+
+    if (list->head == NULL)
+    {
+        list->head = newNode;
+        list->tail = newNode;
+        list->size++;
+        return;
+    }
+    list->tail->next = newNode;
+    newNode->prev = list->tail;
+    list->tail = newNode;
+    list->size++;
+    return;
+}
 void PrintAllUsers()
 {
     for (int i = 0; i < Table_Size; i++)
@@ -206,6 +245,20 @@ void PrintAllUsers()
     }
     return;
 }
+void PrintAllVehicles()
+{
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *temp = VehicleTable->buckets[i]->head;
+        while (temp != NULL)
+        {
+            Vehicle *v = (Vehicle *)temp->data;
+            PrintVehicle(v);
+            temp = temp->next;
+        }
+    }
+    return;
+}
 User *FindUser(DLL *list, char *id)
 {
     if (list->head == NULL)
@@ -215,8 +268,26 @@ User *FindUser(DLL *list, char *id)
     Node *temp = list->head;
     while (temp != NULL)
     {
-        User *current = temp->data;
+        User *current = (User *)temp->data;
         if (!strcmp(current->User_ID, id))
+        {
+            return current;
+        }
+        temp = temp->next;
+    }
+    return NULL;
+}
+Vehicle *FindVehicle(DLL *list, char *licensePlate)
+{
+    if (list->head == NULL)
+    {
+        return NULL;
+    }
+    Node *temp = list->head;
+    while (temp != NULL)
+    {
+        Vehicle *current = (Vehicle *)temp->data;
+        if (!strcmp(current->License_Plate, licensePlate))
         {
             return current;
         }
@@ -247,6 +318,26 @@ void PrintUser(User *user)
     }
     return;
 }
+void PrintVehicle(Vehicle *vehicle)
+{
+    printf("License Plate: %s\n", vehicle->License_Plate[0] != '\0' ? vehicle->License_Plate : "N/A");
+    printf("Make: %s\n", vehicle->Make[0] != '\0' ? vehicle->Make : "N/A");
+    printf("Model: %s\n", vehicle->Model[0] != '\0' ? vehicle->Model : "N/A");
+    printf("Color: %s\n", vehicle->Color[0] != '\0' ? vehicle->Color : "N/A");
+    switch (vehicle->Status)
+    {
+    case 0:
+        printf("Vehicle Status: Active\n");
+        break;
+    case 1:
+        printf("Vehicle Status: Stolen\n");
+        break;
+    case 2:
+        printf("Vehicle Status: Sold\n");
+        break;
+    }
+    return;
+}
 void DeleteUser(DLL *list, char *id)
 {
     if (list->head == NULL)
@@ -258,6 +349,51 @@ void DeleteUser(DLL *list, char *id)
     {
         User *current = (User *)temp->data;
         if (!strcmp(current->User_ID, id))
+        {
+
+            if (temp == list->head)
+            {
+                if (temp->next != NULL)
+                {
+                    list->head = temp->next;
+                    list->head->prev = NULL;
+                }
+                else
+                {
+                    list->head = NULL;
+                    list->tail = NULL;
+                }
+            }
+
+            else if (temp->next != NULL)
+            {
+                temp->prev->next = temp->next;
+                temp->next->prev = temp->prev;
+            }
+            else
+            {
+                list->tail = temp->prev;
+                list->tail->next = NULL;
+            }
+            list->size--;
+            free(current);
+            free(temp);
+            return;
+        }
+        temp = temp->next;
+    }
+}
+void DeleteVehicle(DLL *list, char *licensePlate)
+{
+    if (list->head == NULL)
+    {
+        return;
+    }
+    Node *temp = list->head;
+    while (temp != NULL)
+    {
+        Vehicle *current = (Vehicle *)temp->data;
+        if (!strcmp(current->License_Plate, licensePlate))
         {
 
             if (temp == list->head)
@@ -317,6 +453,42 @@ void LoadUsers(char *filename)
     }
     fclose(file);
     printf("loaded Users successfully!\n");
+    return;
+}
+void LoadVehicles(char *filename)
+{
+    FILE *file = fopen(filename, "r");
+    if (file == NULL)
+    {
+        printf("Couldn't open file: %s\n", filename);
+        return;
+    }
+    char line[Buffer_Size];
+
+    fgets(line, Buffer_Size, file); // skip header line
+
+    while (fgets(line, Buffer_Size, file) != NULL)
+    {
+        line[strcspn(line, "\n")] = 0;
+
+        Vehicle *newVehicle = ParseVehicleLine(line);
+
+        if (newVehicle != NULL)
+        {
+            if (FindUserHash(UserTable, newVehicle->USER_ID) != NULL)
+            {
+                InsertVehicleHash(VehicleTable, newVehicle);
+            }
+            else
+            {
+                printf("Vehicle with License Plate: %s isn't registered to any user. DELETED", newVehicle->License_Plate);
+                free(newVehicle);
+            }
+        }
+    }
+    fclose(file);
+    printf("loaded Vehicles successfully!\n");
+    return;
 }
 User *ParseUserLine(char *line)
 {
@@ -357,12 +529,41 @@ User *ParseUserLine(char *line)
 
     return u;
 }
+Vehicle *ParseVehicleLine(char *line)
+{
+    Vehicle *v = calloc(1, sizeof(Vehicle));
+    if (v == NULL)
+    {
+        return NULL;
+    }
+    char *token;
+
+    token = strtok(line, ",");
+    if (token)
+        strcpy(v->License_Plate, token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(v->Make, token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(v->Model, token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(v->Color, token);
+    token = strtok(NULL, ",");
+    if (token)
+        v->Status = atoi(token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(v->USER_ID, token);
+    return v;
+}
 void SaveUsers(char *filename)
 {
     FILE *file = fopen(filename, "w");
     if (file == NULL)
     {
-        printf("Couldn't open FIle: %s for Writing", filename);
+        printf("Couldn't open FIle: %s for Writing\n", filename);
         return;
     }
     fprintf(file, "UserID,FirstName,LastName,Email,PhoneNum,Status,ExpiryDate,ORG_ID,ROLE_ID\n");
@@ -387,7 +588,36 @@ void SaveUsers(char *filename)
     }
 
     fclose(file);
-    printf("Data Saved Succcessfully to %s", filename);
+    printf("Data Saved Succcessfully to %s\n", filename);
+}
+void SaveVehicles(char *filename)
+{
+    FILE *file = fopen(filename, "w");
+    if (file == NULL)
+    {
+        printf("Couldn't open FIle: %s for Writing\n", filename);
+        return;
+    }
+    fprintf(file, "License_Plate,Make,Model,Color,Status,USER_ID\n");
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *temp = VehicleTable->buckets[i]->head;
+        while (temp != NULL)
+        {
+            Vehicle *v = (Vehicle *)temp->data;
+            fprintf(file, "%s,%s,%s,%s,%d,%s\n",
+                    v->License_Plate,
+                    v->Make,
+                    v->Model,
+                    v->Color,
+                    v->Status,
+                    v->USER_ID);
+            temp = temp->next;
+        }
+    }
+
+    fclose(file);
+    printf("Data Saved Succcessfully to %s\n", filename);
 }
 
 void SystemUI()
@@ -396,11 +626,15 @@ void SystemUI()
     int x;
     do
     {
-        printf("Enter thr value of x:");
+        printf("Enter the value of x:");
         scanf("%d", &x);
         if (x == 1)
         {
             PrintAllUsers();
+        }
+        else if (x == 2)
+        {
+            PrintAllVehicles();
         }
     } while (x != 0);
 
@@ -409,13 +643,13 @@ void SystemUI()
 int Hash(char *str)
 {
     int sum = 0;
-    // while (*str != '\0')
-    // {
-    //     sum += *str;
-    //     str++;
-    // }
+    while (*str != '\0')
+    {
+        sum += *str;
+        str++;
+    }
     int result = sum % Table_Size;
-    return result >= 0 ? result : 0; // handle negative values
+    return result >= 0 ? result : 0;
 }
 HashTable *InitalizeTable()
 {
@@ -432,15 +666,72 @@ void InsertUserHash(HashTable *ht, User *u)
     InsertUser(ht->buckets[index], u);
     return;
 }
+void InsertVehicleHash(HashTable *ht, Vehicle *v)
+{
+    int index = Hash(v->License_Plate);
+    InsertVehicle(ht->buckets[index], v);
+    return;
+}
 User *FindUserHash(HashTable *ht, char *str)
 {
     int index = Hash(str);
     User *u = FindUser(ht->buckets[index], str);
     return u;
 }
+Vehicle *FindVehicleHash(HashTable *ht, char *str)
+{
+    int index = Hash(str);
+    Vehicle *v = FindVehicle(ht->buckets[index], str);
+    return v;
+}
 void DeleteUserHash(HashTable *ht, char *str)
 {
+    DeleteVehiclesOwnedByUser(VehicleTable, str);
     int index = Hash(str);
     DeleteUser(ht->buckets[index], str);
     return;
+}
+void DeleteVehicleHash(HashTable *ht, char *str)
+{
+    int index = Hash(str);
+    DeleteVehicle(ht->buckets[index], str);
+    return;
+}
+void DeleteVehiclesOwnedByUser(HashTable *ht, char *str)
+{
+
+    for (int i = 0; i < Table_Size; i++)
+    {
+        DLL *list = ht->buckets[i];
+        Node *current = list->head;
+        while (current != NULL)
+        {
+            Vehicle *v = (Vehicle *)current->data;
+            Node *nextNode = current->next;
+            if (!strcmp(v->USER_ID, str))
+            {
+                DeleteVehicleHash(VehicleTable, v->License_Plate);
+            }
+            current = nextNode;
+        }
+    }
+    return;
+}
+
+void InitalizeBuffer()
+{
+    UserTable = InitalizeTable();
+    VehicleTable = InitalizeTable();
+    return;
+}
+void LoadData()
+{
+    LoadUsers("UsersFile.csv");
+    LoadVehicles("VehiclesFile.csv");
+    return;
+}
+void SaveData()
+{
+    SaveUsers("UsersFile.csv");
+    SaveVehicles("VehiclesFile.csv");
 }
