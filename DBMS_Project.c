@@ -3,11 +3,13 @@
 #include <string.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <time.h>
 
 #define ID_Len 11
 #define Name_Len 51
 #define Buffer_Size 512
 #define Table_Size 50
+
 /*
     Defining Entites: Start
 */
@@ -65,7 +67,6 @@ typedef struct
     char Email[Name_Len];
     char PhoneNum[ID_Len];
     AccountStatus Status;
-    char ExpiryDate[Name_Len];
     char ORG_ID[ID_Len];
     char ROLE_ID[ID_Len];
 } User;
@@ -142,6 +143,7 @@ void InitalizeBuffer();
 int Hash(char *str);
 int ParseTime(char *timeStr);
 bool CheckDay(char *allowed, char *today);
+bool validateEntry(char *licensePlate, char *gateID);
 
 void PrintAllUsers();
 User *FindUser(DLL *list, char *id);
@@ -230,6 +232,17 @@ void LoadPermissions(char *filename);
 Permissions *ParsePermissionsLine(char *line);
 void SavePermissions(char *filename);
 
+void LoadAccessLog(char *filename);
+Access_Log *ParseAccessLogLine(char *line);
+void SaveAccessLog(char *filename);
+
+void printAccessLog(Access_Log *log);
+void printAllAccessLog();
+void InsertAccessLogHash(Access_Log *log);
+void AddLogEntry(char *licensePlate, char *gateID, Outcome outcome, char *reason);
+
+int NextLogID = 1;
+
 HashTable *UserTable = NULL;
 HashTable *VehicleTable = NULL;
 HashTable *GateTable = NULL;
@@ -237,6 +250,8 @@ HashTable *ZoneTable = NULL;
 HashTable *RoleTable = NULL;
 HashTable *Gate_ZoneTable = NULL;
 HashTable *PermissionsTable = NULL;
+HashTable *AccessLogTable = NULL;
+
 int main()
 {
     InitalizeBuffer();
@@ -491,7 +506,6 @@ void PrintUser(User *user)
     printf("Last Name: %s\n", user->LastName[0] != '\0' ? user->LastName : "N/A");
     printf("Email: %s\n", user->Email[0] != '\0' ? user->Email : "N/A");
     printf("Phone Number: %s\n", user->PhoneNum[0] != '\0' ? user->PhoneNum : "N/A");
-    printf("Expiry Date: %s\n", user->ExpiryDate[0] != '\0' ? user->ExpiryDate : "N/A");
     switch (user->Status)
     {
     case 0:
@@ -980,9 +994,6 @@ User *ParseUserLine(char *line)
         u->Status = atoi(token);
     token = strtok(NULL, ",");
     if (token)
-        strcpy(u->ExpiryDate, token);
-    token = strtok(NULL, ",");
-    if (token)
         strcpy(u->ORG_ID, token);
     token = strtok(NULL, ",");
     if (token)
@@ -1082,21 +1093,20 @@ void SaveUsers(char *filename)
         printf("Couldn't open FIle: %s for Writing\n", filename);
         return;
     }
-    fprintf(file, "UserID,FirstName,LastName,Email,PhoneNum,Status,ExpiryDate,ORG_ID,ROLE_ID\n");
+    fprintf(file, "UserID,FirstName,LastName,Email,PhoneNum,Status,ORG_ID,ROLE_ID\n");
     for (int i = 0; i < Table_Size; i++)
     {
         Node *temp = UserTable->buckets[i]->head;
         while (temp != NULL)
         {
             User *u = (User *)temp->data;
-            fprintf(file, "%s,%s,%s,%s,%s,%d,%s,%s,%s\n",
+            fprintf(file, "%s,%s,%s,%s,%s,%d,%s,%s\n",
                     u->User_ID,
                     u->FirstName,
                     u->LastName,
                     u->Email,
                     u->PhoneNum,
                     u->Status,
-                    u->ExpiryDate,
                     u->ORG_ID,
                     u->ROLE_ID);
             temp = temp->next;
@@ -1651,6 +1661,150 @@ void SavePermissions(char *filename)
     printf("Data Saved Succcessfully to %s\n", filename);
 }
 
+void InsertAccessLogHash(Access_Log *log)
+{
+    int index = Hash(log->License_Plate);
+    Insert(AccessLogTable->buckets[index], log);
+    return;
+}
+void AddLogEntry(char *licensePlate, char *gateID, Outcome outcome, char *reason)
+{
+    Access_Log *log = calloc(1, sizeof(Access_Log));
+    log->Log_ID = NextLogID++;
+    strcpy(log->License_Plate, licensePlate);
+    strcpy(log->GATE_ID, gateID);
+    log->Outcome = outcome;
+    strcpy(log->Reason, reason);
+
+    time_t now = time(NULL);
+    struct tm *tm_info = localtime(&now);
+    strftime(log->TimeStamp, Name_Len, "%Y-%m-%d %H:%M:%S", tm_info);
+
+    InsertAccessLogHash(log);
+    printf("[LOG] %s: %s at %s -> %s (%s)\n", log->TimeStamp, licensePlate, gateID,
+           outcome == Granted ? "GRANTED" : "DENIED", reason);
+    return;
+}
+void printAccessLog(Access_Log *log)
+{
+
+    printf("LogID: %d\n", log->Log_ID);
+    printf("LicensePlate: %s\n", log->License_Plate);
+    printf("GateID: %s\n", log->GATE_ID);
+    printf("TimeStamp: %s\n", log->TimeStamp);
+    switch (log->Outcome)
+    {
+    case 0:
+        printf("Access: Granted\n");
+        break;
+    case 1:
+        printf("Access: Denied\n");
+        break;
+    }
+    printf("Reason: %s\n", log->Reason);
+    return;
+}
+void printAllAccessLog()
+{
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *current = AccessLogTable->buckets[i]->head;
+        while (current != NULL)
+        {
+            Access_Log *log = (Access_Log *)current->data;
+            printAccessLog(log);
+            current = current->next;
+        }
+    }
+    return;
+}
+
+void LoadAccessLog(char *filename)
+{
+    FILE *file = fopen(filename, "r");
+    if (file == NULL)
+    {
+        printf("Couldn't open file: %s\n", filename);
+        return;
+    }
+    char line[Buffer_Size];
+    fgets(line, Buffer_Size, file);
+    while (fgets(line, Buffer_Size, file) != NULL)
+    {
+        line[strcspn(line, "\n")] = 0;
+        Access_Log *log = ParseAccessLogLine(line);
+        if (log != NULL)
+        {
+            InsertAccessLogHash(log);
+            if (log->Log_ID >= NextLogID)
+            {
+                NextLogID = log->Log_ID + 1;
+            }
+        }
+    }
+    fclose(file);
+    printf("loaded Access Logs successfully!\n");
+    return;
+}
+Access_Log *ParseAccessLogLine(char *line)
+{
+    Access_Log *log = calloc(1, sizeof(Access_Log));
+    if (log == NULL)
+        return NULL;
+
+    char *token;
+    token = strtok(line, ",");
+    if (token)
+        log->Log_ID = atoi(token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(log->License_Plate, token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(log->GATE_ID, token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(log->TimeStamp, token);
+    token = strtok(NULL, ",");
+    if (token)
+        log->Outcome = atoi(token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(log->Reason, token);
+
+    return log;
+}
+void SaveAccessLog(char *filename)
+{
+    FILE *file = fopen(filename, "w");
+    if (file == NULL)
+    {
+        printf("Couldn't open FIle: %s for Writing\n", filename);
+        return;
+    }
+
+    fprintf(file, "LogID,LicensePlate,Gate_ID,TimeStamp,Outcome,Reason\n");
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *current = AccessLogTable->buckets[i]->head;
+        while (current != NULL)
+        {
+            Access_Log *log = (Access_Log *)current->data;
+            fprintf(file, "%d,%s,%s,%s,%s,%s",
+                    log->Log_ID,
+                    log->License_Plate,
+                    log->GATE_ID,
+                    log->TimeStamp,
+                    log->Outcome,
+                    log->Reason);
+            current = current->next;
+        }
+    }
+    fclose(file);
+    printf("Data Saved Succcessfully to %s\n", filename);
+    return;
+}
+
 void InitalizeBuffer()
 {
     UserTable = InitalizeTable();
@@ -1660,6 +1814,7 @@ void InitalizeBuffer()
     GateTable = InitalizeTable();
     Gate_ZoneTable = InitalizeTable();
     PermissionsTable = InitalizeTable();
+    AccessLogTable = InitalizeTable();
     return;
 }
 void LoadData()
@@ -1671,6 +1826,7 @@ void LoadData()
     LoadZones("ZonesFile.csv");
     LoadGate_Zone("Gate_ZoneFile.csv");
     LoadPermissions("PermissionsFile.csv");
+    LoadAccessLog("AccessLogFile.csv");
     return;
 }
 void SaveData()
@@ -1682,6 +1838,7 @@ void SaveData()
     SaveZones("ZonesFile.csv");
     SaveGateZone("Gate_ZoneFile.csv");
     SavePermissions("PermissionsFile.csv");
+    SaveAccessLog("AccessLogFile.csv");
     return;
 }
 
@@ -1731,4 +1888,107 @@ bool CheckDay(char *allowed, char *today)
     }
 
     return strstr(allowedCopy, todayCopy) != NULL;
+}
+
+bool validateEntry(char *licensePlate, char *gateID)
+{
+    Vehicle *v = FindVehicleHash(licensePlate);
+    if (v == NULL)
+    {
+        AddLogEntry(licensePlate, gateID, 1, "Vehicle is NOT found.");
+        return false;
+    }
+    if (v->Status == 1)
+    {
+        AddLogEntry(licensePlate, gateID, 1, "Vehicle is Stolen.");
+        return false;
+    }
+    if (v->Status == 2)
+    {
+        AddLogEntry(licensePlate, gateID, 1, "Vehicle is Sold.");
+        return false;
+    }
+    User *u = FindUserHash(v->USER_ID);
+    if (u == NULL)
+    {
+        AddLogEntry(licensePlate, gateID, 1, "Vehicle does not belong to a User.");
+        return false;
+    }
+    if (u->Status == 1)
+    {
+        AddLogEntry(licensePlate, gateID, 1, "User Account Suspended.");
+        return false;
+    }
+    if (u->Status == 2)
+    {
+        AddLogEntry(licensePlate, gateID, 1, "User Account Expired.");
+        return false;
+    }
+    Role *r = FindRoleHash(u->ROLE_ID);
+    if (r == NULL)
+    {
+        AddLogEntry(licensePlate, gateID, 1, "Invalid User Role.");
+        return false;
+    }
+    Gate *g = FindGateHash(gateID);
+    if (g == NULL)
+    {
+        AddLogEntry(licensePlate, gateID, 1, "Invalid Gate.");
+        return false;
+    }
+    if (g->gateStatus == 1)
+    {
+        AddLogEntry(licensePlate, gateID, 1, "Gate Closed.");
+        return false;
+    }
+    if (g->gateStatus == 2)
+    {
+        AddLogEntry(licensePlate, gateID, 1, "Gate under Maintenance.");
+        return false;
+    }
+    DLL *gate_zonelist = GetGateZoneBucket(gateID);
+    Node *temp = gate_zonelist->head;
+    Permissions *p = NULL;
+    while (temp != NULL)
+    {
+        Gate_Zone *gt = (Gate_Zone *)temp->data;
+        if (!strcmp(gt->GATE_ID, gateID))
+        {
+            p = FindPermission(r->Role_ID, gt->ZONE_ID);
+            if (p != NULL)
+            {
+                break;
+            }
+        }
+        temp = temp->next;
+    }
+    if (p == NULL)
+    {
+        AddLogEntry(licensePlate, gateID, 1, "No Permission for this Zone.");
+        return false;
+    }
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    char cTime[Name_Len];
+    char cDay[Name_Len];
+    strftime(cTime, Name_Len, "%H:%M", t);
+    strftime(cDay, Name_Len, "%a", t);
+
+    int currentTime = ParseTime(cTime);
+    int startTime = ParseTime(p->StartTime);
+    int endTime = ParseTime(p->EndTime);
+
+    if (!CheckDay(p->AllowedDays, cDay))
+    {
+        AddLogEntry(licensePlate, gateID, 1, "Restricted Day.");
+        return false;
+    }
+    if (currentTime > endTime || currentTime < startTime)
+    {
+        AddLogEntry(licensePlate, gateID, 1, "Ristricted Time.");
+        return false;
+    }
+
+    AddLogEntry(licensePlate, gateID, 0, "Access Granted.");
+    return true;
 }
