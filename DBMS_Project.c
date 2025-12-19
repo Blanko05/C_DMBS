@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 #define ID_Len 11
 #define Name_Len 51
@@ -110,9 +111,9 @@ typedef struct
 {
     char Role_ID[ID_Len];
     char ZONE_ID[ID_Len];
-    char AllowedDays[8];
-    char StartTime[ID_Len];
-    char EndTime[ID_Len];
+    char AllowedDays[Name_Len];
+    char StartTime[6];
+    char EndTime[6];
 } Permissions;
 typedef struct
 {
@@ -139,6 +140,8 @@ void LoadData();
 void SaveData();
 void InitalizeBuffer();
 int Hash(char *str);
+int ParseTime(char *timeStr);
+bool CheckDay(char *allowed, char *today);
 
 void PrintAllUsers();
 User *FindUser(DLL *list, char *id);
@@ -202,6 +205,7 @@ void DeleteRole(DLL *list, char *id);
 void InsertRoleHash(Role *r);
 Role *FindRoleHash(char *str);
 void DeleteRoleHash(char *str);
+void SetUsersRoleNULL(char *str);
 
 void LoadRoles(char *filename);
 Role *ParseRoleLine(char *line);
@@ -217,12 +221,22 @@ void LoadGate_Zone(char *filename);
 Gate_Zone *ParseGate_ZoneLine(char *line);
 void SaveGateZone(char *filename);
 
+void InsertPermissionHash(Permissions *p);
+Permissions *FindPermission(char *roleID, char *zoneID);
+void DeletePermissionsByRoleID(char *roleID);
+void DeletePermissionsByZoneID(char *zoneID);
+
+void LoadPermissions(char *filename);
+Permissions *ParsePermissionsLine(char *line);
+void SavePermissions(char *filename);
+
 HashTable *UserTable = NULL;
 HashTable *VehicleTable = NULL;
 HashTable *GateTable = NULL;
 HashTable *ZoneTable = NULL;
 HashTable *RoleTable = NULL;
 HashTable *Gate_ZoneTable = NULL;
+HashTable *PermissionsTable = NULL;
 int main()
 {
     InitalizeBuffer();
@@ -600,7 +614,7 @@ void DeleteRole(DLL *list, char *id)
         Role *current = (Role *)temp->data;
         if (!strcmp(current->Role_ID, id))
         {
-
+            SetUsersRoleNULL(current->Role_ID);
             if (temp == list->head)
             {
                 if (temp->next != NULL)
@@ -632,6 +646,24 @@ void DeleteRole(DLL *list, char *id)
         }
         temp = temp->next;
     }
+}
+void SetUsersRoleNULL(char *str)
+{
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *current = UserTable->buckets[i]->head;
+        while (current != NULL)
+        {
+            User *u = current->data;
+            if (!strcmp(u->ROLE_ID, str))
+            {
+                u->ROLE_ID[0] = '\0';
+                printf("User %s disassociated from role %s\n", u->User_ID, str);
+            }
+            current = current->next;
+        }
+    }
+    return;
 }
 void DeleteZone(DLL *list, char *id)
 {
@@ -788,6 +820,14 @@ void LoadUsers(char *filename)
 
         if (newUser != NULL)
         {
+            if (newUser->ROLE_ID[0] == '\0')
+                printf("Warning: User with ID:%s isn't assigned to a Role.\n", newUser->User_ID);
+            else if (newUser->ROLE_ID[0] != '\0' && FindRoleHash(newUser->ROLE_ID) == NULL)
+            {
+                newUser->ROLE_ID[0] = '\0';
+                printf("Warning: User %s has unknown Role '%s'. Role cleared.\n",
+                       newUser->User_ID, newUser->ROLE_ID);
+            }
             InsertUserHash(newUser);
         }
     }
@@ -1331,6 +1371,13 @@ void InsertGate_ZoneHash(Gate_Zone *gz)
         Insert(Gate_ZoneTable->buckets[index], gz);
     return;
 }
+void InsertPermissionHash(Permissions *p)
+{
+    int index = Hash(p->Role_ID);
+    if (FindPermission(p->Role_ID, p->ZONE_ID) == NULL)
+        Insert(PermissionsTable->buckets[index], p);
+    return;
+}
 Gate_Zone *FindGateZoneLink(char *gateID, char *zoneID)
 {
     int index = Hash(gateID);
@@ -1343,6 +1390,23 @@ Gate_Zone *FindGateZoneLink(char *gateID, char *zoneID)
         if (!strcmp(gz->GATE_ID, gateID) && !strcmp(gz->ZONE_ID, zoneID))
         {
             return gz;
+        }
+        current = current->next;
+    }
+    return NULL;
+}
+Permissions *FindPermission(char *roleID, char *zoneID)
+{
+    int index = Hash(roleID);
+    Node *current = PermissionsTable->buckets[index]->head;
+    if (current == NULL)
+        return NULL;
+    while (current != NULL)
+    {
+        Permissions *p = (Permissions *)current->data;
+        if (!strcmp(p->Role_ID, roleID) && !strcmp(p->ZONE_ID, zoneID))
+        {
+            return p;
         }
         current = current->next;
     }
@@ -1364,6 +1428,22 @@ void DeleteGateZonesByGateID(char *gateID)
     }
     return;
 }
+void DeletePermissionsByRoleID(char *roleID)
+{
+    int index = Hash(roleID);
+    Node *current = PermissionsTable->buckets[index]->head;
+    while (current != NULL)
+    {
+        Node *nextNode = current->next;
+        Permissions *p = (Permissions *)current->data;
+        if (!strcmp(p->Role_ID, roleID))
+        {
+            Delete(PermissionsTable->buckets[index], current);
+        }
+        current = nextNode;
+    }
+    return;
+}
 void DeleteGateZonesByZoneID(char *zoneID)
 {
 
@@ -1377,6 +1457,24 @@ void DeleteGateZonesByZoneID(char *zoneID)
             if (!strcmp(gt->ZONE_ID, zoneID))
             {
                 Delete(Gate_ZoneTable->buckets[i], current);
+            }
+            current = nextNode;
+        }
+    }
+    return;
+}
+void DeletePermissionsByZoneID(char *zoneID)
+{
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *current = PermissionsTable->buckets[i]->head;
+        while (current != NULL)
+        {
+            Node *nextNode = current->next;
+            Permissions *p = current->data;
+            if (!strcmp(p->ZONE_ID, zoneID))
+            {
+                Delete(PermissionsTable->buckets[i], current);
             }
             current = nextNode;
         }
@@ -1464,6 +1562,94 @@ void SaveGateZone(char *filename)
     fclose(file);
     printf("Data Saved Succcessfully to %s\n", filename);
 }
+void LoadPermissions(char *filename)
+{
+    FILE *file = fopen(filename, "r");
+    if (file == NULL)
+    {
+        printf("Couldn't open file: %s\n", filename);
+        return;
+    }
+    char line[Buffer_Size];
+
+    fgets(line, Buffer_Size, file); // skip header line
+
+    while (fgets(line, Buffer_Size, file) != NULL)
+    {
+        line[strcspn(line, "\n")] = 0;
+
+        Permissions *newPermission = ParsePermissionsLine(line);
+
+        if (newPermission != NULL)
+        {
+            if (FindRoleHash(newPermission->Role_ID) != NULL && FindZoneHash(newPermission->ZONE_ID) != NULL)
+            {
+                InsertPermissionHash(newPermission);
+            }
+            else
+            {
+                printf("Invalid Permission link: %s, %s. DELETED\n", newPermission->Role_ID, newPermission->ZONE_ID);
+                free(newPermission);
+            }
+        }
+    }
+    fclose(file);
+    printf("loaded Permissions successfully!\n");
+    return;
+}
+Permissions *ParsePermissionsLine(char *line)
+{
+    Permissions *p = calloc(1, sizeof(Permissions));
+    if (p == NULL)
+        return NULL;
+
+    char *token;
+    token = strtok(line, ",");
+    if (token)
+        strcpy(p->Role_ID, token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(p->ZONE_ID, token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(p->AllowedDays, token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(p->StartTime, token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(p->EndTime, token);
+
+    return p;
+}
+void SavePermissions(char *filename)
+{
+    FILE *file = fopen(filename, "w");
+    if (file == NULL)
+    {
+        printf("Couldn't open FIle: %s for Writing\n", filename);
+        return;
+    }
+    fprintf(file, "Role_ID,Zone_ID,AllowedDays,StartTime,EndTime\n");
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *temp = PermissionsTable->buckets[i]->head;
+        while (temp != NULL)
+        {
+            Permissions *p = (Permissions *)temp->data;
+            fprintf(file, "%s,%s,%s,%s,%s\n",
+                    p->Role_ID,
+                    p->ZONE_ID,
+                    p->AllowedDays,
+                    p->StartTime,
+                    p->EndTime);
+            temp = temp->next;
+        }
+    }
+
+    fclose(file);
+    printf("Data Saved Succcessfully to %s\n", filename);
+}
 
 void InitalizeBuffer()
 {
@@ -1473,6 +1659,7 @@ void InitalizeBuffer()
     RoleTable = InitalizeTable();
     GateTable = InitalizeTable();
     Gate_ZoneTable = InitalizeTable();
+    PermissionsTable = InitalizeTable();
     return;
 }
 void LoadData()
@@ -1483,6 +1670,7 @@ void LoadData()
     LoadRoles("RolesFile.csv");
     LoadZones("ZonesFile.csv");
     LoadGate_Zone("Gate_ZoneFile.csv");
+    LoadPermissions("PermissionsFile.csv");
     return;
 }
 void SaveData()
@@ -1493,5 +1681,54 @@ void SaveData()
     SaveRoles("RolesFile.csv");
     SaveZones("ZonesFile.csv");
     SaveGateZone("Gate_ZoneFile.csv");
+    SavePermissions("PermissionsFile.csv");
     return;
+}
+
+int ParseTime(char *timeStr)
+{
+    if (timeStr == NULL || strlen(timeStr) != 5)
+    {
+        return -1;
+    }
+    char check[4] = {timeStr[0], timeStr[1], timeStr[3], timeStr[4]};
+    for (int i = 0; i < 4; i++)
+    {
+        if (!(check[i] >= '0' && check[i] <= '9'))
+        {
+            return -1;
+        }
+    }
+    char hours[3] = {timeStr[0], timeStr[1], '\0'};
+    char mins[3] = {timeStr[3], timeStr[4], '\0'};
+    int time = atoi(hours) * 60;
+    time += atoi(mins);
+    return time;
+}
+bool CheckDay(char *allowed, char *today)
+{
+    if (allowed == NULL || today == NULL)
+    {
+        return false;
+    }
+    char allowedCopy[Name_Len];
+    char todayCopy[ID_Len];
+
+    strcpy(allowedCopy, allowed);
+    strcpy(todayCopy, today);
+
+    char *p = allowedCopy;
+    while (*p != '\0')
+    {
+        *p = tolower((unsigned char)*p);
+        p++;
+    }
+    p = todayCopy;
+    while (*p != '\0')
+    {
+        *p = tolower((unsigned char)*p);
+        p++;
+    }
+
+    return strstr(allowedCopy, todayCopy) != NULL;
 }
