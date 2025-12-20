@@ -273,12 +273,56 @@ void SimulationMenu();
 void ViewLogsMenu();
 void ClearInputBuffer();
 bool isValidPhone(char *phone);
+bool isValidTime(char *time);
 
 void ManageUsersMenu();
 void PrintUserUI();
 void CreateUserUI();
 void UpdateUserUI();
 void DeleteUserUI();
+void ManageVehiclesMenu();
+
+void PrintVehicleUI();
+void CreateVehicleUI();
+void UpdateVehicleUI();
+void DeleteVehicleUI();
+
+void ManageRolesMenu();
+void PrintRoleUI();
+void CreateRoleUI();
+void UpdateRoleUI();
+void DeleteRoleUI();
+
+void ManageOrganizationsMenu();
+void PrintOrganizationUI();
+void CreateOrganizationUI();
+void UpdateOrganizationUI();
+void DeleteOrganizationUI();
+
+void ManageZonesMenu();
+void PrintZoneUI();
+void CreateZoneUI();
+void UpdateZoneUI();
+void DeleteZoneUI();
+
+void ManageGatesMenu();
+void PrintGateUI();
+void CreateGateUI();
+void UpdateGateUI();
+void DeleteGateUI();
+
+void ManagePermissionsMenu();
+void PrintPermissionUI();
+void CreatePermissionUI();
+void DeletePermissionUI();
+void PrintAllPermissions();
+void PrintPermission(Permissions *p);
+
+void ManageGateZonesMenu();
+void CreateGateZoneUI();
+void DeleteGateZoneUI();
+void PrintAllGateZones();
+void PrintGateZone(Gate_Zone *gz);
 
 int main()
 {
@@ -2241,14 +2285,14 @@ void SystemUI()
     int choice;
     do
     {
-        printf("\n========================================\n");
-        printf("      GATE CONTROL SYSTEM v1.0\n");
-        printf("========================================\n");
-        printf("1. [SIMULATION] Simulate Entry Request\n");
-        printf("2. [ADMIN]      Manage Database Entries\n");
-        printf("3. [REPORTS]    View Access Logs\n");
-        printf("4. Save & Exit\n");
-        printf("----------------------------------------\n");
+        printf("\n╔═══════════════════════════════════════╗\n");
+        printf("║     GATE CONTROL SYSTEM v1.0          ║\n");
+        printf("╠═══════════════════════════════════════╣\n");
+        printf("║ 1. [SIMULATION] Entry Request         ║\n");
+        printf("║ 2. [ADMIN]      Database Management   ║\n");
+        printf("║ 3. [REPORTS]    Access Logs           ║\n");
+        printf("║ 4. Save & Exit                        ║\n");
+        printf("╚═══════════════════════════════════════╝\n");
         printf("Select option: ");
 
         if (scanf("%d", &choice) != 1)
@@ -2269,82 +2313,202 @@ void SystemUI()
             ViewLogsMenu();
             break;
         case 4:
-            printf("Saving data...\n");
+            printf("\n💾 Saving data and exiting...\n");
             break;
         default:
-            printf("Invalid selection.\n");
+            printf("❌ Invalid selection. Please choose 1-4.\n");
         }
     } while (choice != 4);
 }
+
 void SimulationMenu()
 {
     char plate[ID_Len];
     char gate[ID_Len];
 
-    printf("\n--- SIMULATION MODE ---\n");
-    printf("Enter License Plate: ");
-    scanf("%s", plate);
-    printf("Enter Gate ID: ");
-    scanf("%s", gate);
+    printf("\n╔═══════════════════════════════════════╗\n");
+    printf("║        ENTRY SIMULATION MODE          ║\n");
+    printf("╚═══════════════════════════════════════╝\n");
 
-    printf("Validating...");
-    bool result = validateEntry(plate, gate); // This already logs internally!
+    printf("Enter License Plate: ");
+    scanf("%10s", plate);
+    printf("Enter Gate ID: ");
+    scanf("%10s", gate);
+
+    printf("\n🔍 Validating access request...\n");
+    bool result = validateEntry(plate, gate);
 
     if (result)
-        printf(" -> ACCESS GRANTED.\n");
+    {
+        printf("\n╔═══════════════════════════════════════╗\n");
+        printf("║  ✅ ACCESS GRANTED                    ║\n");
+        printf("║  Gate opening for %s%-10s%s           ║\n", "\033[1;32m", plate, "\033[0m");
+        printf("╚═══════════════════════════════════════╝\n");
+    }
     else
-        printf(" -> ACCESS DENIED.\n");
+    {
+        printf("\n╔═══════════════════════════════════════╗\n");
+        printf("║  ❌ ACCESS DENIED                     ║\n");
+        printf("║  Vehicle %s%-10s%s blocked            ║\n", "\033[1;31m", plate, "\033[0m");
+        printf("╚═══════════════════════════════════════╝\n");
+    }
 }
 
 void ViewLogsMenu()
 {
     int choice;
-    printf("\n--- VIEW ACCESS LOGS ---\n");
-    printf("1. View All Logs\n");
-    printf("2. Search by License Plate\n");
-    printf("Select: ");
-    scanf("%d", &choice);
+    do
+    {
+        printf("\n╔═══════════════════════════════════════╗\n");
+        printf("║         ACCESS LOGS VIEWER            ║\n");
+        printf("╠═══════════════════════════════════════╣\n");
+        printf("║ 1. View All Logs                     ║\n");
+        printf("║ 2. Search by License Plate           ║\n");
+        printf("║ 3. Search by Gate ID                 ║\n");
+        printf("║ 4. Filter by Outcome (Grant/Deny)    ║\n");
+        printf("║ 5. Back to Main Menu                 ║\n");
+        printf("╚═══════════════════════════════════════╝\n");
+        printf("Select: ");
 
-    if (choice == 1)
-    {
-        printAllAccessLog();
-    }
-    else if (choice == 2)
-    {
-        char plate[ID_Len];
-        printf("Enter Plate: ");
-        scanf("%s", plate);
-        // We need a helper for this, but for now we can scan or filter manually
-        // Since Hash Table is by Plate, we can just print that bucket!
-        int index = Hash(plate);
-        Node *current = AccessLogTable->buckets[index]->head;
-        bool found = false;
-        while (current)
+        if (scanf("%d", &choice) != 1)
         {
-            Access_Log *log = (Access_Log *)current->data;
-            if (!strcmp(log->License_Plate, plate))
-            {
-                printAccessLog(log);
-                found = true;
-            }
-            current = current->next;
+            ClearInputBuffer();
+            choice = -1;
         }
-        if (!found)
-            printf("No logs found for %s\n", plate);
-    }
+
+        switch (choice)
+        {
+        case 1:
+            printf("\n═══ ALL ACCESS LOGS ═══\n");
+            printAllAccessLog();
+            break;
+
+        case 2:
+        {
+            char plate[ID_Len];
+            printf("Enter License Plate: ");
+            scanf("%10s", plate);
+
+            printf("\n═══ LOGS FOR PLATE: %s ═══\n", plate);
+            int index = Hash(plate);
+            Node *current = AccessLogTable->buckets[index]->head;
+            bool found = false;
+
+            while (current)
+            {
+                Access_Log *log = (Access_Log *)current->data;
+                if (!strcmp(log->License_Plate, plate))
+                {
+                    printf("───────────────────────────────────────\n");
+                    printAccessLog(log);
+                    found = true;
+                }
+                current = current->next;
+            }
+
+            if (!found)
+                printf("📭 No logs found for %s\n", plate);
+            break;
+        }
+
+        case 3:
+        {
+            char gateID[ID_Len];
+            printf("Enter Gate ID: ");
+            scanf("%10s", gateID);
+
+            printf("\n═══ LOGS FOR GATE: %s ═══\n", gateID);
+            bool found = false;
+
+            for (int i = 0; i < Table_Size; i++)
+            {
+                Node *current = AccessLogTable->buckets[i]->head;
+                while (current)
+                {
+                    Access_Log *log = (Access_Log *)current->data;
+                    if (!strcmp(log->GATE_ID, gateID))
+                    {
+                        printf("───────────────────────────────────────\n");
+                        printAccessLog(log);
+                        found = true;
+                    }
+                    current = current->next;
+                }
+            }
+
+            if (!found)
+                printf("📭 No logs found for gate %s\n", gateID);
+            break;
+        }
+
+        case 4:
+        {
+            int outcome;
+            printf("Filter by (0=Granted, 1=Denied): ");
+            while (scanf("%d", &outcome) != 1 || (outcome != 0 && outcome != 1))
+            {
+                ClearInputBuffer();
+                printf("Invalid. Enter 0 or 1: ");
+            }
+
+            printf("\n═══ %s ATTEMPTS ═══\n", outcome == 0 ? "GRANTED" : "DENIED");
+            bool found = false;
+
+            for (int i = 0; i < Table_Size; i++)
+            {
+                Node *current = AccessLogTable->buckets[i]->head;
+                while (current)
+                {
+                    Access_Log *log = (Access_Log *)current->data;
+                    if (log->Outcome == outcome)
+                    {
+                        printf("───────────────────────────────────────\n");
+                        printAccessLog(log);
+                        found = true;
+                    }
+                    current = current->next;
+                }
+            }
+
+            if (!found)
+                printf("📭 No %s logs found\n", outcome == 0 ? "granted" : "denied");
+            break;
+        }
+
+        case 5:
+            printf("Returning to main menu...\n");
+            return;
+
+        default:
+            printf("❌ Invalid selection.\n");
+        }
+    } while (choice != 5);
 }
 void ManageDatabaseMenu()
 {
     int choice;
     do
     {
-        printf("\n--- MANAGE DATABASE ---\n");
-        printf("1. Manage Users\n");
-        printf("2. Manage Vehicles (TODO)\n"); // You implement these later
-        printf("3. Manage Roles (TODO)\n");
-        printf("4. Back to Main Menu\n");
-        printf("Select: ");
-        scanf("%d", &choice);
+        printf("\n╔════════════════════════════════════════╗\n");
+        printf("║       DATABASE MANAGEMENT MENU         ║\n");
+        printf("╠════════════════════════════════════════╣\n");
+        printf("║ 1. Manage Users                        ║\n");
+        printf("║ 2. Manage Vehicles                     ║\n");
+        printf("║ 3. Manage Roles                        ║\n");
+        printf("║ 4. Manage Organizations                ║\n");
+        printf("║ 5. Manage Zones                        ║\n");
+        printf("║ 6. Manage Gates                        ║\n");
+        printf("║ 7. Manage Permissions                  ║\n");
+        printf("║ 8. Manage Gate-Zone Links              ║\n");
+        printf("║ 9. Back to Main Menu                   ║\n");
+        printf("╚════════════════════════════════════════╝\n");
+        printf("Select option: ");
+
+        if (scanf("%d", &choice) != 1)
+        {
+            ClearInputBuffer();
+            choice = -1;
+        }
 
         switch (choice)
         {
@@ -2352,26 +2516,56 @@ void ManageDatabaseMenu()
             ManageUsersMenu();
             break;
         case 2:
-            printf("Not implemented yet.\n");
+            ManageVehiclesMenu();
+            break;
+        case 3:
+            ManageRolesMenu();
             break;
         case 4:
-            return;
+            ManageOrganizationsMenu();
+            break;
+        case 5:
+            ManageZonesMenu();
+            break;
+        case 6:
+            ManageGatesMenu();
+            break;
+        case 7:
+            ManagePermissionsMenu();
+            break;
+        case 8:
+            ManageGateZonesMenu();
+            break;
+        case 9:
+            printf("Returning to main menu...\n");
+            break;
+        default:
+            printf("Invalid selection.\n");
         }
-    } while (choice != 4);
+    } while (choice != 9);
 }
 void ManageUsersMenu()
 {
     int choice;
     do
     {
-        printf("\n--- MANAGE USERS ---\n");
-        printf("1. List All Users\n");
-        printf("2. Find User by User_ID\n");
-        printf("3. Add New User\n");
-        printf("4. Update Existing User\n");
-        printf("5. Delete User\n");
-        printf("6. Back\n");
-        scanf("%d", &choice);
+        printf("\n╔════════════════════════════════╗\n");
+        printf("║        MANAGE USERS            ║\n");
+        printf("╠════════════════════════════════╣\n");
+        printf("║ 1. List All Users              ║\n");
+        printf("║ 2. Find User by ID             ║\n");
+        printf("║ 3. Add New User                ║\n");
+        printf("║ 4. Update User                 ║\n");
+        printf("║ 5. Delete User (CASCADE)       ║\n");
+        printf("║ 6. Back                        ║\n");
+        printf("╚════════════════════════════════╝\n");
+        printf("Select: ");
+
+        if (scanf("%d", &choice) != 1)
+        {
+            ClearInputBuffer();
+            choice = -1;
+        }
 
         switch (choice)
         {
@@ -2392,30 +2586,69 @@ void ManageUsersMenu()
             break;
         case 6:
             return;
+        default:
+            printf("Invalid selection.\n");
         }
     } while (choice != 6);
 }
+
 void PrintUserUI()
 {
-
     char buffer[ID_Len];
     printf("Enter User ID: ");
-    scanf("%s", buffer);
+    scanf("%10s", buffer);
+
     User *found = FindUserHash(buffer);
     if (found == NULL)
     {
-        printf("User not found.\n");
+        printf("❌ User not found.\n");
         return;
     }
-    printf("User Details:\n");
+
+    printf("\n═══════ USER DETAILS ═══════\n");
     PrintUser(found);
-    return;
+
+    // Show additional relationship info
+    if (found->ROLE_ID[0] != '\0')
+    {
+        Role *r = FindRoleHash(found->ROLE_ID);
+        if (r != NULL)
+        {
+            printf("🎭 Role: %s\n", r->RoleName);
+        }
+    }
+
+    if (found->ORG_ID[0] != '\0')
+    {
+        Organization *o = FindOrganizationHash(found->ORG_ID);
+        if (o != NULL)
+        {
+            printf("🏢 Organization: %s\n", o->OrgName);
+        }
+    }
+
+    // Count user's vehicles
+    int vehicleCount = 0;
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *temp = VehicleTable->buckets[i]->head;
+        while (temp != NULL)
+        {
+            Vehicle *v = (Vehicle *)temp->data;
+            if (!strcmp(v->USER_ID, found->User_ID))
+            {
+                vehicleCount++;
+            }
+            temp = temp->next;
+        }
+    }
+    printf("🚗 Total Vehicles: %d\n", vehicleCount);
 }
+
 void CreateUserUI()
 {
     User *u = calloc(1, sizeof(User));
-
-    char buffer[ID_Len + 5]; // +5 for safety margin
+    char buffer[ID_Len + 5];
 
     printf("Enter User ID: ");
     scanf("%10s", buffer);
@@ -2423,7 +2656,7 @@ void CreateUserUI()
     // VALIDATION 1: Check if ID exists
     if (FindUserHash(buffer) != NULL)
     {
-        printf("Error: User ID already exists!\n");
+        printf("❌ Error: User ID already exists!\n");
         free(u);
         return;
     }
@@ -2431,57 +2664,76 @@ void CreateUserUI()
 
     printf("Enter First Name: ");
     scanf("%50s", u->FirstName);
+
     printf("Enter Last Name: ");
     scanf("%50s", u->LastName);
+
     printf("Enter Email: ");
     scanf("%50s", u->Email);
 
-    printf("Enter Phone: ");
+    printf("Enter Phone (10 digits): ");
     scanf("%10s", buffer);
 
     while (!isValidPhone(buffer))
     {
-        printf("Invalid phone number. Please enter 10 digits: ");
+        printf("❌ Invalid phone. Enter 10 digits: ");
         scanf("%10s", buffer);
     }
-
     strcpy(u->PhoneNum, buffer);
 
     printf("Status (0=Active, 1=Suspended, 2=Expired): ");
     int s;
-    // Check if scanf got an integer AND range is valid
     while (scanf("%d", &s) != 1 || s < 0 || s > 2)
     {
-
-        while (getchar() != '\n')
-            ;
-        printf("Invalid status. Please enter 0, 1, or 2: ");
+        ClearInputBuffer();
+        printf("Invalid status. Enter 0, 1, or 2: ");
     }
-    u->Status = s;
+    u->Status = (AccountStatus)s;
 
-    printf("Enter Role ID: ");
-    scanf("%s", u->ROLE_ID);
+    printf("Enter Role ID (or 'none' to skip): ");
+    scanf("%10s", buffer);
 
-    // VALIDATION 2: Check if Role Exists
-    if (FindRoleHash(u->ROLE_ID) == NULL)
+    if (strcmp(buffer, "none") == 0)
     {
-        printf("Error: Role ID not found.\n");
-        printf("User assigned to NO role.\n");
-        u->ROLE_ID[0] = '\0'; // Empty role
+        u->ROLE_ID[0] = '\0';
     }
-    printf("Enter Organization ID: ");
-    scanf("%s", u->ORG_ID);
-    // VALIDATION 3: Check if Org Exists
-    if (FindOrganizationHash(u->ORG_ID) == NULL)
+    else
     {
-        printf("Error: Organization ID not found.\n");
-        printf("User assigned to NO organization.\n");
-        u->ORG_ID[0] = '\0'; // Empty org
+        if (FindRoleHash(buffer) == NULL)
+        {
+            printf("⚠️  Role not found. User created without role.\n");
+            u->ROLE_ID[0] = '\0';
+        }
+        else
+        {
+            strcpy(u->ROLE_ID, buffer);
+        }
+    }
+
+    printf("Enter Organization ID (or 'none' to skip): ");
+    scanf("%10s", buffer);
+
+    if (strcmp(buffer, "none") == 0)
+    {
+        u->ORG_ID[0] = '\0';
+    }
+    else
+    {
+        if (FindOrganizationHash(buffer) == NULL)
+        {
+            printf("⚠️  Organization not found. User created without org.\n");
+            u->ORG_ID[0] = '\0';
+        }
+        else
+        {
+            strcpy(u->ORG_ID, buffer);
+        }
     }
 
     InsertUserHash(u);
-    printf("User added successfully.\n");
+    printf("✅ User added successfully.\n");
 }
+
 bool isValidPhone(char *phone)
 {
     if (strlen(phone) != 10)
@@ -2503,110 +2755,167 @@ void UpdateUserUI()
     User *u = FindUserHash(id);
     if (u == NULL)
     {
-        printf("User not found.\n");
+        printf("❌ User not found.\n");
         return;
     }
 
     PrintUser(u);
 
-    printf("\nUpdate Options:\n");
-    printf("1. First Name\n2. Last Name\n3. Email\n4. Phone Number\n");
-    printf("5. Status\n6. Organization\n7. Role\n");
+    printf("\n╔════════════════════════════╗\n");
+    printf("║     UPDATE OPTIONS         ║\n");
+    printf("╠════════════════════════════╣\n");
+    printf("║ 1. First Name              ║\n");
+    printf("║ 2. Last Name               ║\n");
+    printf("║ 3. Email                   ║\n");
+    printf("║ 4. Phone Number            ║\n");
+    printf("║ 5. Status                  ║\n");
+    printf("║ 6. Organization            ║\n");
+    printf("║ 7. Role                    ║\n");
+    printf("╚════════════════════════════╝\n");
     printf("Select option (1-7): ");
 
     int choice;
-
     while (scanf("%d", &choice) != 1 || choice < 1 || choice > 7)
     {
-        // Clear buffer if they typed letters
-        while (getchar() != '\n')
-            ;
-        printf("Invalid selection. Please enter 1-7: ");
+        ClearInputBuffer();
+        printf("Invalid selection. Enter 1-7: ");
     }
 
-    // 2. EXECUTION SWITCH
     switch (choice)
     {
     case 1:
         printf("New First Name: ");
         scanf("%50s", u->FirstName);
-        printf("First Name updated.\n");
+        printf("✅ First Name updated.\n");
         break;
+
     case 2:
         printf("New Last Name: ");
         scanf("%50s", u->LastName);
-        printf("Last Name updated.\n");
+        printf("✅ Last Name updated.\n");
         break;
+
     case 3:
         printf("New Email: ");
         scanf("%50s", u->Email);
-        printf("Email updated.\n");
+        printf("✅ Email updated.\n");
         break;
+
     case 4:
     {
         char buffer[ID_Len + 5];
-        printf("New Phone Number: ");
+        printf("New Phone Number (10 digits): ");
         scanf("%10s", buffer);
 
         while (!isValidPhone(buffer))
         {
-            printf("Invalid phone number. Please enter 10 digits: ");
+            printf("❌ Invalid phone. Enter 10 digits: ");
             scanf("%10s", buffer);
         }
         strcpy(u->PhoneNum, buffer);
-        printf("Phone Number updated.\n");
+        printf("✅ Phone Number updated.\n");
         break;
     }
+
     case 5:
     {
         printf("New Status (0=Active, 1=Suspended, 2=Expired): ");
         int s;
         while (scanf("%d", &s) != 1 || s < 0 || s > 2)
         {
-            while (getchar() != '\n')
-                ;
+            ClearInputBuffer();
             printf("Invalid status. Enter 0, 1, or 2: ");
         }
         u->Status = (AccountStatus)s;
-        printf("Status updated.\n");
+        printf("✅ Status updated.\n");
         break;
     }
+
     case 6:
-        printf("New Organization ID: ");
-        scanf("%s", u->ORG_ID);
-        // FIX: If Org doesn't exist, don't assign it (or set to empty)
-        if (FindOrganizationHash(u->ORG_ID) == NULL)
+    {
+        char buffer[ID_Len];
+        printf("New Organization ID (or 'none' to clear): ");
+        scanf("%10s", buffer);
+
+        if (strcmp(buffer, "none") == 0)
         {
-            printf("Warning: Organization ID not found. Organization cleared.\n");
             u->ORG_ID[0] = '\0';
+            printf("✅ Organization cleared.\n");
+        }
+        else if (FindOrganizationHash(buffer) == NULL)
+        {
+            printf("❌ Organization not found. Unchanged.\n");
         }
         else
         {
-            printf("Organization updated.\n");
+            strcpy(u->ORG_ID, buffer);
+            printf("✅ Organization updated.\n");
         }
         break;
+    }
+
     case 7:
-        printf("New Role ID: ");
-        scanf("%s", u->ROLE_ID);
-        if (FindRoleHash(u->ROLE_ID) == NULL)
+    {
+        char buffer[ID_Len];
+        printf("New Role ID (or 'none' to clear): ");
+        scanf("%10s", buffer);
+
+        if (strcmp(buffer, "none") == 0)
         {
-            printf("Error: Role ID not found. Role cleared.\n");
             u->ROLE_ID[0] = '\0';
+            printf("✅ Role cleared.\n");
+        }
+        else if (FindRoleHash(buffer) == NULL)
+        {
+            printf("❌ Role not found. Unchanged.\n");
         }
         else
         {
-            printf("Role updated.\n");
+            strcpy(u->ROLE_ID, buffer);
+            printf("✅ Role updated.\n");
         }
         break;
+    }
     }
 }
+
 void DeleteUserUI()
 {
     char id[ID_Len];
     printf("Enter User ID to delete: ");
-    scanf("%s", id);
-    DeleteUserHash(id);
-    printf("User deleted (if existed).\n");
+    scanf("%10s", id);
+
+    User *u = FindUserHash(id);
+    if (u != NULL)
+    {
+        // Show what will be deleted
+        int vehicleCount = 0;
+        for (int i = 0; i < Table_Size; i++)
+        {
+            Node *temp = VehicleTable->buckets[i]->head;
+            while (temp != NULL)
+            {
+                Vehicle *v = (Vehicle *)temp->data;
+                if (!strcmp(v->USER_ID, id))
+                {
+                    vehicleCount++;
+                }
+                temp = temp->next;
+            }
+        }
+
+        printf("⚠️  WARNING: This will CASCADE delete:\n");
+        printf("    - User: %s %s\n", u->FirstName, u->LastName);
+        printf("    - %d vehicle(s) owned by this user\n", vehicleCount);
+
+        printf("🗑️  Deleting user and associated vehicles...\n");
+        DeleteUserHash(id);
+        printf("✅ User deleted successfully.\n");
+    }
+    else
+    {
+        printf("❌ User not found.\n");
+    }
 }
 
 void ClearInputBuffer()
@@ -2615,4 +2924,1247 @@ void ClearInputBuffer()
     while ((c = getchar()) != '\n' && c != EOF)
         ;
 }
-// testing branch
+
+// ========== VEHICLES CRUD ==========
+void ManageVehiclesMenu()
+{
+    int choice;
+    do
+    {
+        printf("\n╔════════════════════════════════╗\n");
+        printf("║      MANAGE VEHICLES           ║\n");
+        printf("╠════════════════════════════════╣\n");
+        printf("║ 1. List All Vehicles           ║\n");
+        printf("║ 2. Find Vehicle by Plate      ║\n");
+        printf("║ 3. Add New Vehicle             ║\n");
+        printf("║ 4. Update Vehicle              ║\n");
+        printf("║ 5. Delete Vehicle              ║\n");
+        printf("║ 6. Back                        ║\n");
+        printf("╚════════════════════════════════╝\n");
+        printf("Select: ");
+
+        if (scanf("%d", &choice) != 1)
+        {
+            ClearInputBuffer();
+            choice = -1;
+        }
+
+        switch (choice)
+        {
+        case 1:
+            PrintAllVehicles();
+            break;
+        case 2:
+            PrintVehicleUI();
+            break;
+        case 3:
+            CreateVehicleUI();
+            break;
+        case 4:
+            UpdateVehicleUI();
+            break;
+        case 5:
+            DeleteVehicleUI();
+            break;
+        case 6:
+            return;
+        default:
+            printf("Invalid selection.\n");
+        }
+    } while (choice != 6);
+}
+
+void PrintVehicleUI()
+{
+    char plate[ID_Len];
+    printf("Enter License Plate: ");
+    scanf("%10s", plate);
+
+    Vehicle *v = FindVehicleHash(plate);
+    if (v == NULL)
+    {
+        printf("❌ Vehicle not found.\n");
+        return;
+    }
+
+    printf("\n═══════ VEHICLE DETAILS ═══════\n");
+    PrintVehicle(v);
+
+    User *owner = FindUserHash(v->USER_ID);
+    if (owner != NULL)
+    {
+        printf("👤 Owner: %s %s (ID: %s)\n", owner->FirstName, owner->LastName, owner->User_ID);
+    }
+}
+
+void CreateVehicleUI()
+{
+    Vehicle *v = calloc(1, sizeof(Vehicle));
+
+    printf("Enter License Plate: ");
+    scanf("%10s", v->License_Plate);
+
+    if (FindVehicleHash(v->License_Plate) != NULL)
+    {
+        printf("❌ Error: Vehicle with this plate already exists!\n");
+        free(v);
+        return;
+    }
+
+    printf("Enter Make: ");
+    scanf("%50s", v->Make);
+    printf("Enter Model: ");
+    scanf("%50s", v->Model);
+    printf("Enter Color: ");
+    scanf("%50s", v->Color);
+
+    printf("Status (0=Active, 1=Stolen, 2=Sold): ");
+    int s;
+    while (scanf("%d", &s) != 1 || s < 0 || s > 2)
+    {
+        ClearInputBuffer();
+        printf("Invalid status. Enter 0, 1, or 2: ");
+    }
+    v->Status = (VehicleStatus)s;
+
+    printf("Enter Owner User ID: ");
+    scanf("%10s", v->USER_ID);
+
+    if (FindUserHash(v->USER_ID) == NULL)
+    {
+        printf("❌ Error: User ID not found. Vehicle must have a valid owner.\n");
+        free(v);
+        return;
+    }
+
+    InsertVehicleHash(v);
+    printf("✅ Vehicle added successfully.\n");
+}
+
+void UpdateVehicleUI()
+{
+    char plate[ID_Len];
+    printf("Enter License Plate: ");
+    scanf("%10s", plate);
+
+    Vehicle *v = FindVehicleHash(plate);
+    if (v == NULL)
+    {
+        printf("❌ Vehicle not found.\n");
+        return;
+    }
+
+    PrintVehicle(v);
+
+    printf("\n╔════════════════════════╗\n");
+    printf("║   UPDATE OPTIONS       ║\n");
+    printf("╠════════════════════════╣\n");
+    printf("║ 1. Make                ║\n");
+    printf("║ 2. Model               ║\n");
+    printf("║ 3. Color               ║\n");
+    printf("║ 4. Status              ║\n");
+    printf("║ 5. Owner               ║\n");
+    printf("╚════════════════════════╝\n");
+    printf("Select: ");
+
+    int choice;
+    while (scanf("%d", &choice) != 1 || choice < 1 || choice > 5)
+    {
+        ClearInputBuffer();
+        printf("Invalid. Enter 1-5: ");
+    }
+
+    switch (choice)
+    {
+    case 1:
+        printf("New Make: ");
+        scanf("%50s", v->Make);
+        break;
+    case 2:
+        printf("New Model: ");
+        scanf("%50s", v->Model);
+        break;
+    case 3:
+        printf("New Color: ");
+        scanf("%50s", v->Color);
+        break;
+    case 4:
+        printf("New Status (0=Active, 1=Stolen, 2=Sold): ");
+        int s;
+        while (scanf("%d", &s) != 1 || s < 0 || s > 2)
+        {
+            ClearInputBuffer();
+            printf("Invalid. Enter 0-2: ");
+        }
+        v->Status = (VehicleStatus)s;
+        break;
+    case 5:
+        char newOwner[ID_Len];
+        printf("New Owner User ID: ");
+        scanf("%10s", newOwner);
+        if (FindUserHash(newOwner) == NULL)
+        {
+            printf("❌ User not found. Owner unchanged.\n");
+            return;
+        }
+        strcpy(v->USER_ID, newOwner);
+        break;
+    }
+    printf("✅ Updated successfully.\n");
+}
+
+void DeleteVehicleUI()
+{
+    char plate[ID_Len];
+    printf("Enter License Plate: ");
+    scanf("%10s", plate);
+
+    Vehicle *v = FindVehicleHash(plate);
+    if (v != NULL)
+    {
+        printf("🗑️  Deleting: %s %s %s\n", v->Make, v->Model, v->Color);
+        DeleteVehicleHash(plate);
+        printf("✅ Vehicle deleted.\n");
+    }
+    else
+    {
+        printf("❌ Vehicle not found.\n");
+    }
+}
+
+// ========== ROLES CRUD ==========
+void ManageRolesMenu()
+{
+    int choice;
+    do
+    {
+        printf("\n╔════════════════════════════════╗\n");
+        printf("║        MANAGE ROLES            ║\n");
+        printf("╠════════════════════════════════╣\n");
+        printf("║ 1. List All Roles              ║\n");
+        printf("║ 2. Find Role by ID             ║\n");
+        printf("║ 3. Add New Role                ║\n");
+        printf("║ 4. Update Role                 ║\n");
+        printf("║ 5. Delete Role (CASCADE)       ║\n");
+        printf("║ 6. Back                        ║\n");
+        printf("╚════════════════════════════════╝\n");
+        printf("Select: ");
+
+        if (scanf("%d", &choice) != 1)
+        {
+            ClearInputBuffer();
+            choice = -1;
+        }
+
+        switch (choice)
+        {
+        case 1:
+            PrintAllRoles();
+            break;
+        case 2:
+            PrintRoleUI();
+            break;
+        case 3:
+            CreateRoleUI();
+            break;
+        case 4:
+            UpdateRoleUI();
+            break;
+        case 5:
+            DeleteRoleUI();
+            break;
+        case 6:
+            return;
+        default:
+            printf("Invalid selection.\n");
+        }
+    } while (choice != 6);
+}
+
+void PrintRoleUI()
+{
+    char id[ID_Len];
+    printf("Enter Role ID: ");
+    scanf("%10s", id);
+
+    Role *r = FindRoleHash(id);
+    if (r == NULL)
+    {
+        printf("❌ Role not found.\n");
+        return;
+    }
+
+    printf("\n═══════ ROLE DETAILS ═══════\n");
+    PrintRole(r);
+}
+
+void CreateRoleUI()
+{
+    Role *r = calloc(1, sizeof(Role));
+
+    printf("Enter Role ID: ");
+    scanf("%10s", r->Role_ID);
+
+    if (FindRoleHash(r->Role_ID) != NULL)
+    {
+        printf("❌ Error: Role ID already exists!\n");
+        free(r);
+        return;
+    }
+
+    printf("Enter Role Name: ");
+    scanf("%50s", r->RoleName);
+
+    ClearInputBuffer();
+    printf("Enter Description (max 200 chars): ");
+    fgets(r->RoleDescription, 201, stdin);
+    r->RoleDescription[strcspn(r->RoleDescription, "\n")] = 0;
+
+    InsertRoleHash(r);
+    printf("✅ Role added successfully.\n");
+}
+
+void UpdateRoleUI()
+{
+    char id[ID_Len];
+    printf("Enter Role ID: ");
+    scanf("%10s", id);
+
+    Role *r = FindRoleHash(id);
+    if (r == NULL)
+    {
+        printf("❌ Role not found.\n");
+        return;
+    }
+
+    PrintRole(r);
+
+    printf("\n1. Update Name\n2. Update Description\nSelect: ");
+    int choice;
+    while (scanf("%d", &choice) != 1 || choice < 1 || choice > 2)
+    {
+        ClearInputBuffer();
+        printf("Invalid. Enter 1 or 2: ");
+    }
+
+    if (choice == 1)
+    {
+        printf("New Name: ");
+        scanf("%50s", r->RoleName);
+    }
+    else
+    {
+        ClearInputBuffer();
+        printf("New Description: ");
+        fgets(r->RoleDescription, 201, stdin);
+        r->RoleDescription[strcspn(r->RoleDescription, "\n")] = 0;
+    }
+    printf("✅ Updated successfully.\n");
+}
+
+void DeleteRoleUI()
+{
+    char id[ID_Len];
+    printf("Enter Role ID: ");
+    scanf("%10s", id);
+
+    Role *r = FindRoleHash(id);
+    if (r != NULL)
+    {
+        printf("⚠️  WARNING: Will clear user role assignments & permissions!\n");
+        printf("🗑️  Deleting: %s\n", r->RoleName);
+        DeleteRoleHash(id);
+        printf("✅ Role deleted.\n");
+    }
+    else
+    {
+        printf("❌ Role not found.\n");
+    }
+}
+
+// ========== ORGANIZATIONS CRUD ==========
+void ManageOrganizationsMenu()
+{
+    int choice;
+    do
+    {
+        printf("\n╔════════════════════════════════╗\n");
+        printf("║    MANAGE ORGANIZATIONS        ║\n");
+        printf("╠════════════════════════════════╣\n");
+        printf("║ 1. List All Organizations      ║\n");
+        printf("║ 2. Find Organization           ║\n");
+        printf("║ 3. Add New Organization        ║\n");
+        printf("║ 4. Update Organization         ║\n");
+        printf("║ 5. Delete Organization         ║\n");
+        printf("║ 6. Back                        ║\n");
+        printf("╚════════════════════════════════╝\n");
+        printf("Select: ");
+
+        if (scanf("%d", &choice) != 1)
+        {
+            ClearInputBuffer();
+            choice = -1;
+        }
+
+        switch (choice)
+        {
+        case 1:
+            PrintAllOrganizations();
+            break;
+        case 2:
+            PrintOrganizationUI();
+            break;
+        case 3:
+            CreateOrganizationUI();
+            break;
+        case 4:
+            UpdateOrganizationUI();
+            break;
+        case 5:
+            DeleteOrganizationUI();
+            break;
+        case 6:
+            return;
+        default:
+            printf("Invalid selection.\n");
+        }
+    } while (choice != 6);
+}
+
+void PrintOrganizationUI()
+{
+    char id[ID_Len];
+    printf("Enter Organization ID: ");
+    scanf("%10s", id);
+
+    Organization *o = FindOrganizationHash(id);
+    if (o == NULL)
+    {
+        printf("❌ Organization not found.\n");
+        return;
+    }
+
+    printf("\n═══════ ORGANIZATION DETAILS ═══════\n");
+    PrintOrganization(o);
+
+    if (o->ZONE_ID[0] != '\0')
+    {
+        Zone *z = FindZoneHash(o->ZONE_ID);
+        if (z != NULL)
+        {
+            printf("📍 Zone: %s\n", z->ZoneName);
+        }
+    }
+}
+
+void CreateOrganizationUI()
+{
+    Organization *o = calloc(1, sizeof(Organization));
+
+    printf("Enter Organization ID: ");
+    scanf("%10s", o->Org_ID);
+
+    if (FindOrganizationHash(o->Org_ID) != NULL)
+    {
+        printf("❌ Error: Organization ID exists!\n");
+        free(o);
+        return;
+    }
+
+    printf("Enter Name: ");
+    scanf("%50s", o->OrgName);
+    printf("Enter Type: ");
+    scanf("%50s", o->Type);
+
+    printf("Enter Zone ID (or 'none'): ");
+    char zone[ID_Len];
+    scanf("%10s", zone);
+
+    if (strcmp(zone, "none") == 0)
+    {
+        o->ZONE_ID[0] = '\0';
+    }
+    else if (FindZoneHash(zone) == NULL)
+    {
+        printf("⚠️  Zone not found. Created without zone.\n");
+        o->ZONE_ID[0] = '\0';
+    }
+    else
+    {
+        strcpy(o->ZONE_ID, zone);
+    }
+
+    InsertOrganizationHash(o);
+    printf("✅ Organization added.\n");
+}
+
+void UpdateOrganizationUI()
+{
+    char id[ID_Len];
+    printf("Enter Organization ID: ");
+    scanf("%10s", id);
+
+    Organization *o = FindOrganizationHash(id);
+    if (o == NULL)
+    {
+        printf("❌ Organization not found.\n");
+        return;
+    }
+
+    PrintOrganization(o);
+
+    printf("\n1. Name\n2. Type\n3. Zone\nSelect: ");
+    int choice;
+    while (scanf("%d", &choice) != 1 || choice < 1 || choice > 3)
+    {
+        ClearInputBuffer();
+        printf("Invalid. Enter 1-3: ");
+    }
+
+    switch (choice)
+    {
+    case 1:
+        printf("New Name: ");
+        scanf("%50s", o->OrgName);
+        break;
+    case 2:
+        printf("New Type: ");
+        scanf("%50s", o->Type);
+        break;
+    case 3:
+        char zone[ID_Len];
+        printf("New Zone ID (or 'none'): ");
+        scanf("%10s", zone);
+
+        if (strcmp(zone, "none") == 0)
+        {
+            o->ZONE_ID[0] = '\0';
+        }
+        else if (FindZoneHash(zone) == NULL)
+        {
+            printf("❌ Zone not found. Unchanged.\n");
+            return;
+        }
+        else
+        {
+            strcpy(o->ZONE_ID, zone);
+        }
+        break;
+    }
+    printf("✅ Updated successfully.\n");
+}
+
+void DeleteOrganizationUI()
+{
+    char id[ID_Len];
+    printf("Enter Organization ID: ");
+    scanf("%10s", id);
+
+    Organization *o = FindOrganizationHash(id);
+    if (o != NULL)
+    {
+        printf("⚠️  Will clear user org assignments!\n");
+        printf("🗑️  Deleting: %s\n", o->OrgName);
+        DeleteOrganizationHash(id);
+        printf("✅ Organization deleted.\n");
+    }
+    else
+    {
+        printf("❌ Organization not found.\n");
+    }
+}
+
+// ========== ZONES CRUD ==========
+void ManageZonesMenu()
+{
+    int choice;
+    do
+    {
+        printf("\n╔════════════════════════════════╗\n");
+        printf("║        MANAGE ZONES            ║\n");
+        printf("╠════════════════════════════════╣\n");
+        printf("║ 1. List All Zones              ║\n");
+        printf("║ 2. Find Zone by ID             ║\n");
+        printf("║ 3. Add New Zone                ║\n");
+        printf("║ 4. Update Zone                 ║\n");
+        printf("║ 5. Delete Zone (CASCADE)       ║\n");
+        printf("║ 6. Back                        ║\n");
+        printf("╚════════════════════════════════╝\n");
+        printf("Select: ");
+
+        if (scanf("%d", &choice) != 1)
+        {
+            ClearInputBuffer();
+            choice = -1;
+        }
+
+        switch (choice)
+        {
+        case 1:
+            PrintAllZones();
+            break;
+        case 2:
+            PrintZoneUI();
+            break;
+        case 3:
+            CreateZoneUI();
+            break;
+        case 4:
+            UpdateZoneUI();
+            break;
+        case 5:
+            DeleteZoneUI();
+            break;
+        case 6:
+            return;
+        default:
+            printf("Invalid selection.\n");
+        }
+    } while (choice != 6);
+}
+
+void PrintZoneUI()
+{
+    char id[ID_Len];
+    printf("Enter Zone ID: ");
+    scanf("%10s", id);
+
+    Zone *z = FindZoneHash(id);
+    if (z == NULL)
+    {
+        printf("❌ Zone not found.\n");
+        return;
+    }
+
+    printf("\n═══════ ZONE DETAILS ═══════\n");
+    PrintZone(z);
+}
+
+void CreateZoneUI()
+{
+    Zone *z = calloc(1, sizeof(Zone));
+
+    printf("Enter Zone ID: ");
+    scanf("%10s", z->Zone_ID);
+
+    if (FindZoneHash(z->Zone_ID) != NULL)
+    {
+        printf("❌ Error: Zone ID exists!\n");
+        free(z);
+        return;
+    }
+
+    printf("Enter Zone Name: ");
+    scanf("%50s", z->ZoneName);
+
+    InsertZoneHash(z);
+    printf("✅ Zone added.\n");
+}
+
+void UpdateZoneUI()
+{
+    char id[ID_Len];
+    printf("Enter Zone ID: ");
+    scanf("%10s", id);
+
+    Zone *z = FindZoneHash(id);
+    if (z == NULL)
+    {
+        printf("❌ Zone not found.\n");
+        return;
+    }
+
+    PrintZone(z);
+    printf("\nNew Zone Name: ");
+    scanf("%50s", z->ZoneName);
+    printf("✅ Updated.\n");
+}
+
+void DeleteZoneUI()
+{
+    char id[ID_Len];
+    printf("Enter Zone ID: ");
+    scanf("%10s", id);
+
+    Zone *z = FindZoneHash(id);
+    if (z != NULL)
+    {
+        printf("⚠️  Will delete gate links & permissions!\n");
+        printf("🗑️  Deleting: %s\n", z->ZoneName);
+        DeleteZoneHash(id);
+        printf("✅ Zone deleted.\n");
+    }
+    else
+    {
+        printf("❌ Zone not found.\n");
+    }
+}
+
+// ========== GATES CRUD ==========
+void ManageGatesMenu()
+{
+    int choice;
+    do
+    {
+        printf("\n╔════════════════════════════════╗\n");
+        printf("║        MANAGE GATES            ║\n");
+        printf("╠════════════════════════════════╣\n");
+        printf("║ 1. List All Gates              ║\n");
+        printf("║ 2. Find Gate by ID             ║\n");
+        printf("║ 3. Add New Gate                ║\n");
+        printf("║ 4. Update Gate                 ║\n");
+        printf("║ 5. Delete Gate                 ║\n");
+        printf("║ 6. Back                        ║\n");
+        printf("╚════════════════════════════════╝\n");
+        printf("Select: ");
+
+        if (scanf("%d", &choice) != 1)
+        {
+            ClearInputBuffer();
+            choice = -1;
+        }
+
+        switch (choice)
+        {
+        case 1:
+            PrintAllGates();
+            break;
+        case 2:
+            PrintGateUI();
+            break;
+        case 3:
+            CreateGateUI();
+            break;
+        case 4:
+            UpdateGateUI();
+            break;
+        case 5:
+            DeleteGateUI();
+            break;
+        case 6:
+            return;
+        default:
+            printf("Invalid selection.\n");
+        }
+    } while (choice != 6);
+}
+
+void PrintGateUI()
+{
+    char id[ID_Len];
+    printf("Enter Gate ID: ");
+    scanf("%10s", id);
+
+    Gate *g = FindGateHash(id);
+    if (g == NULL)
+    {
+        printf("❌ Gate not found.\n");
+        return;
+    }
+
+    printf("\n═══════ GATE DETAILS ═══════\n");
+    PrintGate(g);
+}
+
+void CreateGateUI()
+{
+    Gate *g = calloc(1, sizeof(Gate));
+
+    printf("Enter Gate ID: ");
+    scanf("%10s", g->Gate_ID);
+
+    if (FindGateHash(g->Gate_ID) != NULL)
+    {
+        printf("❌ Error: Gate ID exists!\n");
+        free(g);
+        return;
+    }
+
+    printf("Enter Gate Name: ");
+    scanf("%50s", g->gateName);
+
+    printf("Status (0=Active, 1=Closed, 2=Maintenance): ");
+    int s;
+    while (scanf("%d", &s) != 1 || s < 0 || s > 2)
+    {
+        ClearInputBuffer();
+        printf("Invalid. Enter 0-2: ");
+    }
+    g->gateStatus = (GateStatus)s;
+
+    InsertGateHash(g);
+    printf("✅ Gate added.\n");
+}
+
+void UpdateGateUI()
+{
+    char id[ID_Len];
+    printf("Enter Gate ID: ");
+    scanf("%10s", id);
+
+    Gate *g = FindGateHash(id);
+    if (g == NULL)
+    {
+        printf("❌ Gate not found.\n");
+        return;
+    }
+
+    PrintGate(g);
+
+    printf("\n1. Name\n2. Status\nSelect: ");
+    int choice;
+    while (scanf("%d", &choice) != 1 || choice < 1 || choice > 2)
+    {
+        ClearInputBuffer();
+        printf("Invalid. Enter 1-2: ");
+    }
+
+    if (choice == 1)
+    {
+        printf("New Name: ");
+        scanf("%50s", g->gateName);
+    }
+    else
+    {
+        printf("New Status (0=Active, 1=Closed, 2=Maintenance): ");
+        int s;
+        while (scanf("%d", &s) != 1 || s < 0 || s > 2)
+        {
+            ClearInputBuffer();
+            printf("Invalid. Enter 0-2: ");
+        }
+        g->gateStatus = (GateStatus)s;
+    }
+    printf("✅ Updated.\n");
+}
+
+void DeleteGateUI()
+{
+    char id[ID_Len];
+    printf("Enter Gate ID: ");
+    scanf("%10s", id);
+
+    Gate *g = FindGateHash(id);
+    if (g != NULL)
+    {
+        printf("⚠️  Will delete gate-zone links!\n");
+        printf("🗑️  Deleting: %s\n", g->gateName);
+        DeleteGateHash(id);
+        printf("✅ Gate deleted.\n");
+    }
+    else
+    {
+        printf("❌ Gate not found.\n");
+    }
+}
+
+// ========== PERMISSIONS CRUD ==========
+void PrintPermission(Permissions *p)
+{
+    printf("Role ID: %s\n", p->Role_ID);
+    printf("Zone ID: %s\n", p->ZONE_ID);
+    printf("Days: %s\n", p->AllowedDays);
+    printf("Time: %s - %s\n", p->StartTime, p->EndTime);
+}
+
+void PrintAllPermissions()
+{
+    printf("\n═══════ ALL PERMISSIONS ═══════\n");
+    int count = 0;
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *temp = PermissionsTable->buckets[i]->head;
+        while (temp != NULL)
+        {
+            Permissions *p = (Permissions *)temp->data;
+            printf("───────────────────────\n");
+            PrintPermission(p);
+            count++;
+            temp = temp->next;
+        }
+    }
+    printf("Total: %d permissions\n", count);
+}
+
+bool isValidTime(char *time)
+{
+    if (strlen(time) != 5 || time[2] != ':')
+        return false;
+
+    for (int i = 0; i < 5; i++)
+    {
+        if (i == 2)
+            continue;
+        if (time[i] < '0' || time[i] > '9')
+            return false;
+    }
+
+    int h = (time[0] - '0') * 10 + (time[1] - '0');
+    int m = (time[3] - '0') * 10 + (time[4] - '0');
+
+    return (h >= 0 && h <= 23 && m >= 0 && m <= 59);
+}
+void ManagePermissionsMenu()
+{
+    int choice;
+    do
+    {
+        printf("\n╔════════════════════════════════╗\n");
+        printf("║     MANAGE PERMISSIONS         ║\n");
+        printf("╠════════════════════════════════╣\n");
+        printf("║ 1. List All Permissions        ║\n");
+        printf("║ 2. Find Permission             ║\n");
+        printf("║ 3. Add New Permission          ║\n");
+        printf("║ 4. Delete Permission           ║\n");
+        printf("║ 5. Back                        ║\n");
+        printf("╚════════════════════════════════╝\n");
+        printf("Select: ");
+
+        if (scanf("%d", &choice) != 1)
+        {
+            ClearInputBuffer();
+            choice = -1;
+        }
+
+        switch (choice)
+        {
+        case 1:
+            PrintAllPermissions();
+            break;
+        case 2:
+            PrintPermissionUI();
+            break;
+        case 3:
+            CreatePermissionUI();
+            break;
+        case 4:
+            DeletePermissionUI();
+            break;
+        case 5:
+            return;
+        default:
+            printf("Invalid selection.\n");
+        }
+    } while (choice != 5);
+}
+
+void PrintPermissionUI()
+{
+    char roleID[ID_Len];
+    char zoneID[ID_Len];
+
+    printf("Enter Role ID: ");
+    scanf("%10s", roleID);
+    printf("Enter Zone ID: ");
+    scanf("%10s", zoneID);
+
+    Permissions *p = FindPermission(roleID, zoneID);
+    if (p == NULL)
+    {
+        printf("❌ Permission not found.\n");
+        return;
+    }
+
+    printf("\n═══════ PERMISSION DETAILS ═══════\n");
+    PrintPermission(p);
+}
+
+void CreatePermissionUI()
+{
+    Permissions *p = calloc(1, sizeof(Permissions));
+
+    printf("Enter Role ID: ");
+    scanf("%10s", p->Role_ID);
+
+    if (FindRoleHash(p->Role_ID) == NULL)
+    {
+        printf("❌ Error: Role not found.\n");
+        free(p);
+        return;
+    }
+
+    printf("Enter Zone ID: ");
+    scanf("%10s", p->ZONE_ID);
+
+    if (FindZoneHash(p->ZONE_ID) == NULL)
+    {
+        printf("❌ Error: Zone not found.\n");
+        free(p);
+        return;
+    }
+
+    if (FindPermission(p->Role_ID, p->ZONE_ID) != NULL)
+    {
+        printf("❌ Error: Permission already exists!\n");
+        free(p);
+        return;
+    }
+
+    printf("Enter Allowed Days (e.g., 'Mon,Tue,Wed' or 'All'): ");
+    scanf("%50s", p->AllowedDays);
+
+    printf("Enter Start Time (HH:MM format, e.g., 08:00): ");
+    scanf("%5s", p->StartTime);
+
+    while (!isValidTime(p->StartTime))
+    {
+        printf("❌ Invalid time format. Use HH:MM (e.g., 08:00): ");
+        scanf("%5s", p->StartTime);
+    }
+
+    printf("Enter End Time (HH:MM format, e.g., 17:00): ");
+    scanf("%5s", p->EndTime);
+
+    while (!isValidTime(p->EndTime))
+    {
+        printf("❌ Invalid time format. Use HH:MM (e.g., 17:00): ");
+        scanf("%5s", p->EndTime);
+    }
+
+    InsertPermissionHash(p);
+    printf("✅ Permission added successfully.\n");
+}
+
+void DeletePermissionUI()
+{
+    char roleID[ID_Len];
+    char zoneID[ID_Len];
+
+    printf("Enter Role ID: ");
+    scanf("%10s", roleID);
+    printf("Enter Zone ID: ");
+    scanf("%10s", zoneID);
+
+    Permissions *p = FindPermission(roleID, zoneID);
+    if (p == NULL)
+    {
+        printf("❌ Permission not found.\n");
+        return;
+    }
+
+    printf("🗑️  Deleting permission for Role %s -> Zone %s\n", roleID, zoneID);
+
+    // Delete from hash table
+    int index = Hash(roleID);
+    Node *current = PermissionsTable->buckets[index]->head;
+    while (current != NULL)
+    {
+        Permissions *perm = (Permissions *)current->data;
+        if (!strcmp(perm->Role_ID, roleID) && !strcmp(perm->ZONE_ID, zoneID))
+        {
+            Delete(PermissionsTable->buckets[index], current);
+            printf("✅ Permission deleted.\n");
+            return;
+        }
+        current = current->next;
+    }
+}
+
+// ========== GATE-ZONE LINKS MANAGEMENT ==========
+void PrintGateZone(Gate_Zone *gz)
+{
+    Gate *g = FindGateHash(gz->GATE_ID);
+    Zone *z = FindZoneHash(gz->ZONE_ID);
+
+    printf("Gate: %s", gz->GATE_ID);
+    if (g != NULL)
+        printf(" (%s)", g->gateName);
+    printf(" -> Zone: %s", gz->ZONE_ID);
+    if (z != NULL)
+        printf(" (%s)", z->ZoneName);
+    printf("\n");
+}
+
+void PrintAllGateZones()
+{
+    printf("\n═══════ ALL GATE-ZONE LINKS ═══════\n");
+    int count = 0;
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *temp = Gate_ZoneTable->buckets[i]->head;
+        while (temp != NULL)
+        {
+            Gate_Zone *gz = (Gate_Zone *)temp->data;
+            PrintGateZone(gz);
+            count++;
+            temp = temp->next;
+        }
+    }
+    printf("Total: %d links\n", count);
+}
+
+void ManageGateZonesMenu()
+{
+    int choice;
+    do
+    {
+        printf("\n╔════════════════════════════════╗\n");
+        printf("║   MANAGE GATE-ZONE LINKS       ║\n");
+        printf("╠════════════════════════════════╣\n");
+        printf("║ 1. List All Links              ║\n");
+        printf("║ 2. Add Gate-Zone Link          ║\n");
+        printf("║ 3. Delete Gate-Zone Link       ║\n");
+        printf("║ 4. View Gates for Zone         ║\n");
+        printf("║ 5. View Zones for Gate         ║\n");
+        printf("║ 6. Back                        ║\n");
+        printf("╚════════════════════════════════╝\n");
+        printf("Select: ");
+
+        if (scanf("%d", &choice) != 1)
+        {
+            ClearInputBuffer();
+            choice = -1;
+        }
+
+        switch (choice)
+        {
+        case 1:
+            PrintAllGateZones();
+            break;
+        case 2:
+            CreateGateZoneUI();
+            break;
+        case 3:
+            DeleteGateZoneUI();
+            break;
+        case 4:
+        {
+            char zoneID[ID_Len];
+            printf("Enter Zone ID: ");
+            scanf("%10s", zoneID);
+
+            printf("\n═══ Gates accessing Zone %s ═══\n", zoneID);
+            int found = 0;
+            for (int i = 0; i < Table_Size; i++)
+            {
+                Node *temp = Gate_ZoneTable->buckets[i]->head;
+                while (temp != NULL)
+                {
+                    Gate_Zone *gz = (Gate_Zone *)temp->data;
+                    if (!strcmp(gz->ZONE_ID, zoneID))
+                    {
+                        Gate *g = FindGateHash(gz->GATE_ID);
+                        if (g != NULL)
+                        {
+                            printf("  🚪 %s - %s\n", gz->GATE_ID, g->gateName);
+                            found++;
+                        }
+                    }
+                    temp = temp->next;
+                }
+            }
+            if (!found)
+                printf("  No gates linked to this zone.\n");
+            break;
+        }
+        case 5:
+        {
+            char gateID[ID_Len];
+            printf("Enter Gate ID: ");
+            scanf("%10s", gateID);
+
+            printf("\n═══ Zones accessible via Gate %s ═══\n", gateID);
+            DLL *bucket = GetGateZoneBucket(gateID);
+            Node *temp = bucket->head;
+            int found = 0;
+            while (temp != NULL)
+            {
+                Gate_Zone *gz = (Gate_Zone *)temp->data;
+                if (!strcmp(gz->GATE_ID, gateID))
+                {
+                    Zone *z = FindZoneHash(gz->ZONE_ID);
+                    if (z != NULL)
+                    {
+                        printf("  📍 %s - %s\n", gz->ZONE_ID, z->ZoneName);
+                        found++;
+                    }
+                }
+                temp = temp->next;
+            }
+            if (!found)
+                printf("  No zones linked to this gate.\n");
+            break;
+        }
+        case 6:
+            return;
+        default:
+            printf("Invalid selection.\n");
+        }
+    } while (choice != 6);
+}
+
+void CreateGateZoneUI()
+{
+    Gate_Zone *gz = calloc(1, sizeof(Gate_Zone));
+
+    printf("Enter Gate ID: ");
+    scanf("%10s", gz->GATE_ID);
+
+    if (FindGateHash(gz->GATE_ID) == NULL)
+    {
+        printf("❌ Error: Gate not found.\n");
+        free(gz);
+        return;
+    }
+
+    printf("Enter Zone ID: ");
+    scanf("%10s", gz->ZONE_ID);
+
+    if (FindZoneHash(gz->ZONE_ID) == NULL)
+    {
+        printf("❌ Error: Zone not found.\n");
+        free(gz);
+        return;
+    }
+
+    if (FindGateZoneLink(gz->GATE_ID, gz->ZONE_ID) != NULL)
+    {
+        printf("❌ Error: Link already exists!\n");
+        free(gz);
+        return;
+    }
+
+    InsertGate_ZoneHash(gz);
+    printf("✅ Gate-Zone link created successfully.\n");
+
+    Gate *g = FindGateHash(gz->GATE_ID);
+    Zone *z = FindZoneHash(gz->ZONE_ID);
+    if (g && z)
+    {
+        printf("   🚪 %s now accesses 📍 %s\n", g->gateName, z->ZoneName);
+    }
+}
+
+void DeleteGateZoneUI()
+{
+    char gateID[ID_Len];
+    char zoneID[ID_Len];
+
+    printf("Enter Gate ID: ");
+    scanf("%10s", gateID);
+    printf("Enter Zone ID: ");
+    scanf("%10s", zoneID);
+
+    Gate_Zone *gz = FindGateZoneLink(gateID, zoneID);
+    if (gz == NULL)
+    {
+        printf("❌ Link not found.\n");
+        return;
+    }
+
+    printf("🗑️  Deleting Gate-Zone link...\n");
+    // Delete from hash table
+    int index = Hash(gateID);
+    Node *current = Gate_ZoneTable->buckets[index]->head;
+    while (current != NULL)
+    {
+        Gate_Zone *link = (Gate_Zone *)current->data;
+        if (!strcmp(link->GATE_ID, gateID) && !strcmp(link->ZONE_ID, zoneID))
+        {
+            Delete(Gate_ZoneTable->buckets[index], current);
+            printf("✅ Gate-Zone link deleted.\n");
+            return;
+        }
+        current = current->next;
+    }
+}
