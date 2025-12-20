@@ -190,6 +190,7 @@ void PrintAllZones();
 Zone *FindZone(DLL *list, char *id);
 void PrintZone(Zone *zone);
 void DeleteZone(DLL *list, char *id);
+void SetOrganizationZoneNULL(char *str);
 
 void InsertZoneHash(Zone *z);
 Zone *FindZoneHash(char *str);
@@ -241,6 +242,20 @@ void printAllAccessLog();
 void InsertAccessLogHash(Access_Log *log);
 void AddLogEntry(char *licensePlate, char *gateID, Outcome outcome, char *reason);
 
+void PrintAllOrganizations();
+Organization *FindOrganization(DLL *list, char *id);
+void PrintOrganization(Organization *organization);
+void DeleteOrganization(DLL *list, char *id);
+
+void InsertOrganizationHash(Organization *o);
+Organization *FindOrganizationHash(char *str);
+void DeleteOrganizationHash(char *str);
+void SetUsersOrganizationNULL(char *str);
+
+void LoadOrganizations(char *filename);
+Organization *ParseOrganizationLine(char *line);
+void SaveOrganizations(char *filename);
+
 int NextLogID = 1;
 
 HashTable *UserTable = NULL;
@@ -251,10 +266,12 @@ HashTable *RoleTable = NULL;
 HashTable *Gate_ZoneTable = NULL;
 HashTable *PermissionsTable = NULL;
 HashTable *AccessLogTable = NULL;
+HashTable *OrganizationTable = NULL;
 
 int main()
 {
     InitalizeBuffer();
+
     LoadData();
 
     SystemUI();
@@ -366,6 +383,20 @@ void PrintAllRoles()
     }
     return;
 }
+void PrintAllOrganizations()
+{
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *temp = OrganizationTable->buckets[i]->head;
+        while (temp != NULL)
+        {
+            Organization *o = (Organization *)temp->data;
+            PrintOrganization(o);
+            temp = temp->next;
+        }
+    }
+    return;
+}
 void PrintAllZones()
 {
     for (int i = 0; i < Table_Size; i++)
@@ -437,6 +468,24 @@ Role *FindRole(DLL *list, char *id)
     {
         Role *current = (Role *)temp->data;
         if (!strcmp(current->Role_ID, id))
+        {
+            return current;
+        }
+        temp = temp->next;
+    }
+    return NULL;
+}
+Organization *FindOrganization(DLL *list, char *id)
+{
+    if (list->head == NULL)
+    {
+        return NULL;
+    }
+    Node *temp = list->head;
+    while (temp != NULL)
+    {
+        Organization *current = (Organization *)temp->data;
+        if (!strcmp(current->Org_ID, id))
         {
             return current;
         }
@@ -525,6 +574,14 @@ void PrintRole(Role *role)
     printf("RoleID: %s\n", role->Role_ID[0] != '\0' ? role->Role_ID : "N/A");
     printf("Name: %s\n", role->RoleName[0] != '\0' ? role->RoleName : "N/A");
     printf("description: %s\n", role->RoleDescription[0] != '\0' ? role->RoleDescription : "N/A");
+    return;
+}
+void PrintOrganization(Organization *organization)
+{
+    printf("ORG_ID: %s\n", organization->Org_ID[0] != '\0' ? organization->Org_ID : "N/A");
+    printf("Name: %s\n", organization->OrgName[0] != '\0' ? organization->OrgName : "N/A");
+    printf("Type: %s\n", organization->Type[0] != '\0' ? organization->Type : "N/A");
+
     return;
 }
 void PrintZone(Zone *zone)
@@ -629,6 +686,52 @@ void DeleteRole(DLL *list, char *id)
         if (!strcmp(current->Role_ID, id))
         {
             SetUsersRoleNULL(current->Role_ID);
+            DeletePermissionsByRoleID(current->Role_ID);
+            if (temp == list->head)
+            {
+                if (temp->next != NULL)
+                {
+                    list->head = temp->next;
+                    list->head->prev = NULL;
+                }
+                else
+                {
+                    list->head = NULL;
+                    list->tail = NULL;
+                }
+            }
+
+            else if (temp->next != NULL)
+            {
+                temp->prev->next = temp->next;
+                temp->next->prev = temp->prev;
+            }
+            else
+            {
+                list->tail = temp->prev;
+                list->tail->next = NULL;
+            }
+            list->size--;
+            free(current);
+            free(temp);
+            return;
+        }
+        temp = temp->next;
+    }
+}
+void DeleteOrganization(DLL *list, char *id)
+{
+    if (list->head == NULL)
+    {
+        return;
+    }
+    Node *temp = list->head;
+    while (temp != NULL)
+    {
+        Organization *current = (Organization *)temp->data;
+        if (!strcmp(current->Org_ID, id))
+        {
+            SetUsersOrganizationNULL(current->Org_ID);
             if (temp == list->head)
             {
                 if (temp->next != NULL)
@@ -679,6 +782,24 @@ void SetUsersRoleNULL(char *str)
     }
     return;
 }
+void SetUsersOrganizationNULL(char *str)
+{
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *current = UserTable->buckets[i]->head;
+        while (current != NULL)
+        {
+            User *u = current->data;
+            if (!strcmp(u->ORG_ID, str))
+            {
+                u->ORG_ID[0] = '\0';
+                printf("User %s disassociated from Organization %s\n", u->User_ID, str);
+            }
+            current = current->next;
+        }
+    }
+    return;
+}
 void DeleteZone(DLL *list, char *id)
 {
     if (list->head == NULL)
@@ -691,7 +812,9 @@ void DeleteZone(DLL *list, char *id)
         Zone *current = (Zone *)temp->data;
         if (!strcmp(current->Zone_ID, id))
         {
-
+            SetOrganizationZoneNULL(current->Zone_ID);
+            DeleteGateZonesByZoneID(current->Zone_ID);
+            DeletePermissionsByZoneID(current->Zone_ID);
             if (temp == list->head)
             {
                 if (temp->next != NULL)
@@ -724,6 +847,24 @@ void DeleteZone(DLL *list, char *id)
         temp = temp->next;
     }
 }
+void SetOrganizationZoneNULL(char *str)
+{
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *current = OrganizationTable->buckets[i]->head;
+        while (current != NULL)
+        {
+            Organization *org = (Organization *)current->data;
+            if (!strcmp(org->ZONE_ID, str))
+            {
+                org->ZONE_ID[0] = '\0';
+                printf("Warning: Organization %s dissociated from deleted Zone.\n", org->OrgName);
+            }
+            current = current->next;
+        }
+    }
+    return;
+}
 void DeleteGate(DLL *list, char *id)
 {
     if (list->head == NULL)
@@ -736,7 +877,7 @@ void DeleteGate(DLL *list, char *id)
         Gate *current = (Gate *)temp->data;
         if (!strcmp(current->Gate_ID, id))
         {
-
+            DeleteGateZonesByGateID(current->Gate_ID);
             if (temp == list->head)
             {
                 if (temp->next != NULL)
@@ -842,6 +983,14 @@ void LoadUsers(char *filename)
                 printf("Warning: User %s has unknown Role '%s'. Role cleared.\n",
                        newUser->User_ID, newUser->ROLE_ID);
             }
+            if (newUser->ORG_ID[0] == '\0')
+                printf("Warning: User with ID:%s isn't assigned to an Organization.\n", newUser->User_ID);
+            else if (newUser->ORG_ID[0] != '\0' && FindOrganizationHash(newUser->ORG_ID) == NULL)
+            {
+                newUser->ORG_ID[0] = '\0';
+                printf("Warning: User %s has unknown Organization '%s'. Organization cleared.\n",
+                       newUser->User_ID, newUser->ORG_ID);
+            }
             InsertUserHash(newUser);
         }
     }
@@ -874,6 +1023,33 @@ void LoadRoles(char *filename)
     }
     fclose(file);
     printf("loaded Roles successfully!\n");
+    return;
+}
+void LoadOrganizations(char *filename)
+{
+    FILE *file = fopen(filename, "r");
+    if (file == NULL)
+    {
+        printf("Couldn't open file: %s\n", filename);
+        return;
+    }
+    char line[Buffer_Size];
+
+    fgets(line, Buffer_Size, file); // skip header line
+
+    while (fgets(line, Buffer_Size, file) != NULL)
+    {
+        line[strcspn(line, "\n")] = 0;
+
+        Organization *newOrg = ParseOrganizationLine(line);
+
+        if (newOrg != NULL)
+        {
+            InsertOrganizationHash(newOrg);
+        }
+    }
+    fclose(file);
+    printf("loaded Organizations successfully!\n");
     return;
 }
 void LoadZones(char *filename)
@@ -1036,6 +1212,29 @@ Role *ParseRoleLine(char *line)
         strcpy(r->RoleDescription, token);
     return r;
 }
+Organization *ParseOrganizationLine(char *line)
+{
+    Organization *o = calloc(1, sizeof(Organization));
+    if (o == NULL)
+        return NULL;
+
+    char *token;
+
+    token = strtok(line, ",");
+    if (token)
+        strcpy(o->Org_ID, token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(o->OrgName, token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(o->Type, token);
+    token = strtok(NULL, ",");
+    if (token)
+        strcpy(o->ZONE_ID, token);
+
+    return o;
+}
 Gate *ParseGateLine(char *line)
 {
     Gate *g = calloc(1, sizeof(Gate));
@@ -1193,6 +1392,33 @@ void SaveRoles(char *filename)
     fclose(file);
     printf("Data Saved Succcessfully to %s\n", filename);
 }
+void SaveOrganizations(char *filename)
+{
+    FILE *file = fopen(filename, "w");
+    if (file == NULL)
+    {
+        printf("Couldn't open FIle: %s for Writing\n", filename);
+        return;
+    }
+    fprintf(file, "ORG_ID,Name,Type,ZoneID\n");
+    for (int i = 0; i < Table_Size; i++)
+    {
+        Node *temp = OrganizationTable->buckets[i]->head;
+        while (temp != NULL)
+        {
+            Organization *o = (Organization *)temp->data;
+            fprintf(file, "%s,%s,%s,%s\n",
+                    o->Org_ID,
+                    o->OrgName,
+                    o->Type,
+                    o->ZONE_ID);
+            temp = temp->next;
+        }
+    }
+
+    fclose(file);
+    printf("Data Saved Succcessfully to %s\n", filename);
+}
 void SaveVehicles(char *filename)
 {
     FILE *file = fopen(filename, "w");
@@ -1275,6 +1501,12 @@ void InsertRoleHash(Role *r)
     Insert(RoleTable->buckets[index], r);
     return;
 }
+void InsertOrganizationHash(Organization *o)
+{
+    int index = Hash(o->Org_ID);
+    Insert(OrganizationTable->buckets[index], o);
+    return;
+}
 void InsertGateHash(Gate *g)
 {
     int index = Hash(g->Gate_ID);
@@ -1303,6 +1535,12 @@ Role *FindRoleHash(char *str)
     int index = Hash(str);
     Role *r = FindRole(RoleTable->buckets[index], str);
     return r;
+}
+Organization *FindOrganizationHash(char *str)
+{
+    int index = Hash(str);
+    Organization *o = FindOrganization(OrganizationTable->buckets[index], str);
+    return o;
 }
 Zone *FindZoneHash(char *str)
 {
@@ -1333,6 +1571,12 @@ void DeleteRoleHash(char *str)
 {
     int index = Hash(str);
     DeleteRole(RoleTable->buckets[index], str);
+    return;
+}
+void DeleteOrganizationHash(char *str)
+{
+    int index = Hash(str);
+    DeleteOrganization(OrganizationTable->buckets[index], str);
     return;
 }
 void DeleteZoneHash(char *str)
@@ -1790,7 +2034,7 @@ void SaveAccessLog(char *filename)
         while (current != NULL)
         {
             Access_Log *log = (Access_Log *)current->data;
-            fprintf(file, "%d,%s,%s,%s,%s,%s",
+            fprintf(file, "%d,%s,%s,%s,%d,%s",
                     log->Log_ID,
                     log->License_Plate,
                     log->GATE_ID,
@@ -1815,18 +2059,24 @@ void InitalizeBuffer()
     Gate_ZoneTable = InitalizeTable();
     PermissionsTable = InitalizeTable();
     AccessLogTable = InitalizeTable();
+    OrganizationTable = InitalizeTable();
     return;
 }
 void LoadData()
 {
+    LoadZones("ZonesFile.csv");
+    LoadRoles("RolesFile.csv");
+    LoadOrganizations("OrganizationsFile.csv");
+    LoadGates("GatesFile.csv");
+
     LoadUsers("UsersFile.csv");
     LoadVehicles("VehiclesFile.csv");
-    LoadGates("GatesFile.csv");
-    LoadRoles("RolesFile.csv");
-    LoadZones("ZonesFile.csv");
+
     LoadGate_Zone("Gate_ZoneFile.csv");
     LoadPermissions("PermissionsFile.csv");
+
     LoadAccessLog("AccessLogFile.csv");
+
     return;
 }
 void SaveData()
@@ -1839,6 +2089,7 @@ void SaveData()
     SaveGateZone("Gate_ZoneFile.csv");
     SavePermissions("PermissionsFile.csv");
     SaveAccessLog("AccessLogFile.csv");
+    SaveOrganizations("OrganizationsFile.csv");
     return;
 }
 
@@ -1985,7 +2236,7 @@ bool validateEntry(char *licensePlate, char *gateID)
     }
     if (currentTime > endTime || currentTime < startTime)
     {
-        AddLogEntry(licensePlate, gateID, 1, "Ristricted Time.");
+        AddLogEntry(licensePlate, gateID, 1, "Restricted Time.");
         return false;
     }
 
