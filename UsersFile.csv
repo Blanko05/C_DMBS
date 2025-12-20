@@ -1,2 +1,3 @@
 UserID,FirstName,LastName,Email,PhoneNum,Status,ORG_ID,ROLE_ID
 U_001,John,Doe,Doe@gmail.com,0776665442,0,,
+U_002,Mohammed,Muhaisen,Mohammed@gmail.com,1234567890,0,,

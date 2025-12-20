@@ -268,6 +268,18 @@ HashTable *PermissionsTable = NULL;
 HashTable *AccessLogTable = NULL;
 HashTable *OrganizationTable = NULL;
 
+void ManageDatabaseMenu();
+void SimulationMenu();
+void ViewLogsMenu();
+void ClearInputBuffer();
+bool isValidPhone(char *phone);
+
+void ManageUsersMenu();
+void PrintUserUI();
+void CreateUserUI();
+void UpdateUserUI();
+void DeleteUserUI();
+
 int main()
 {
     InitalizeBuffer();
@@ -1449,26 +1461,6 @@ void SaveVehicles(char *filename)
     printf("Data Saved Succcessfully to %s\n", filename);
 }
 
-void SystemUI()
-{
-    // TO-DO
-    int x;
-    do
-    {
-        printf("Enter the value of x:");
-        scanf("%d", &x);
-        if (x == 1)
-        {
-            PrintAllUsers();
-        }
-        else if (x == 2)
-        {
-            PrintAllVehicles();
-        }
-    } while (x != 0);
-
-    return;
-}
 int Hash(char *str)
 {
     int sum = 0;
@@ -2242,4 +2234,384 @@ bool validateEntry(char *licensePlate, char *gateID)
 
     AddLogEntry(licensePlate, gateID, 0, "Access Granted.");
     return true;
+}
+
+void SystemUI()
+{
+    int choice;
+    do
+    {
+        printf("\n========================================\n");
+        printf("      GATE CONTROL SYSTEM v1.0\n");
+        printf("========================================\n");
+        printf("1. [SIMULATION] Simulate Entry Request\n");
+        printf("2. [ADMIN]      Manage Database Entries\n");
+        printf("3. [REPORTS]    View Access Logs\n");
+        printf("4. Save & Exit\n");
+        printf("----------------------------------------\n");
+        printf("Select option: ");
+
+        if (scanf("%d", &choice) != 1)
+        {
+            ClearInputBuffer();
+            choice = -1;
+        }
+
+        switch (choice)
+        {
+        case 1:
+            SimulationMenu();
+            break;
+        case 2:
+            ManageDatabaseMenu();
+            break;
+        case 3:
+            ViewLogsMenu();
+            break;
+        case 4:
+            printf("Saving data...\n");
+            break;
+        default:
+            printf("Invalid selection.\n");
+        }
+    } while (choice != 4);
+}
+void SimulationMenu()
+{
+    char plate[ID_Len];
+    char gate[ID_Len];
+
+    printf("\n--- SIMULATION MODE ---\n");
+    printf("Enter License Plate: ");
+    scanf("%s", plate);
+    printf("Enter Gate ID: ");
+    scanf("%s", gate);
+
+    printf("Validating...");
+    bool result = validateEntry(plate, gate); // This already logs internally!
+
+    if (result)
+        printf(" -> ACCESS GRANTED.\n");
+    else
+        printf(" -> ACCESS DENIED.\n");
+}
+
+void ViewLogsMenu()
+{
+    int choice;
+    printf("\n--- VIEW ACCESS LOGS ---\n");
+    printf("1. View All Logs\n");
+    printf("2. Search by License Plate\n");
+    printf("Select: ");
+    scanf("%d", &choice);
+
+    if (choice == 1)
+    {
+        printAllAccessLog();
+    }
+    else if (choice == 2)
+    {
+        char plate[ID_Len];
+        printf("Enter Plate: ");
+        scanf("%s", plate);
+        // We need a helper for this, but for now we can scan or filter manually
+        // Since Hash Table is by Plate, we can just print that bucket!
+        int index = Hash(plate);
+        Node *current = AccessLogTable->buckets[index]->head;
+        bool found = false;
+        while (current)
+        {
+            Access_Log *log = (Access_Log *)current->data;
+            if (!strcmp(log->License_Plate, plate))
+            {
+                printAccessLog(log);
+                found = true;
+            }
+            current = current->next;
+        }
+        if (!found)
+            printf("No logs found for %s\n", plate);
+    }
+}
+void ManageDatabaseMenu()
+{
+    int choice;
+    do
+    {
+        printf("\n--- MANAGE DATABASE ---\n");
+        printf("1. Manage Users\n");
+        printf("2. Manage Vehicles (TODO)\n"); // You implement these later
+        printf("3. Manage Roles (TODO)\n");
+        printf("4. Back to Main Menu\n");
+        printf("Select: ");
+        scanf("%d", &choice);
+
+        switch (choice)
+        {
+        case 1:
+            ManageUsersMenu();
+            break;
+        case 2:
+            printf("Not implemented yet.\n");
+            break;
+        case 4:
+            return;
+        }
+    } while (choice != 4);
+}
+void ManageUsersMenu()
+{
+    int choice;
+    do
+    {
+        printf("\n--- MANAGE USERS ---\n");
+        printf("1. List All Users\n");
+        printf("2. Find User by User_ID\n");
+        printf("3. Add New User\n");
+        printf("4. Update Existing User\n");
+        printf("5. Delete User\n");
+        printf("6. Back\n");
+        scanf("%d", &choice);
+
+        switch (choice)
+        {
+        case 1:
+            PrintAllUsers();
+            break;
+        case 2:
+            PrintUserUI();
+            break;
+        case 3:
+            CreateUserUI();
+            break;
+        case 4:
+            UpdateUserUI();
+            break;
+        case 5:
+            DeleteUserUI();
+            break;
+        case 6:
+            return;
+        }
+    } while (choice != 6);
+}
+void PrintUserUI()
+{
+
+    char buffer[ID_Len];
+    printf("Enter User ID: ");
+    scanf("%s", buffer);
+    User *found = FindUserHash(buffer);
+    if (found == NULL)
+    {
+        printf("User not found.\n");
+        return;
+    }
+    printf("User Details:\n");
+    PrintUser(found);
+    return;
+}
+void CreateUserUI()
+{
+    User *u = calloc(1, sizeof(User));
+
+    char buffer[ID_Len + 5]; // +5 for safety margin
+
+    printf("Enter User ID: ");
+    scanf("%10s", buffer);
+
+    // VALIDATION 1: Check if ID exists
+    if (FindUserHash(buffer) != NULL)
+    {
+        printf("Error: User ID already exists!\n");
+        free(u);
+        return;
+    }
+    strcpy(u->User_ID, buffer);
+
+    printf("Enter First Name: ");
+    scanf("%50s", u->FirstName);
+    printf("Enter Last Name: ");
+    scanf("%50s", u->LastName);
+    printf("Enter Email: ");
+    scanf("%50s", u->Email);
+
+    printf("Enter Phone: ");
+    scanf("%10s", buffer);
+
+    while (!isValidPhone(buffer))
+    {
+        printf("Invalid phone number. Please enter 10 digits: ");
+        scanf("%10s", buffer);
+    }
+
+    strcpy(u->PhoneNum, buffer);
+
+    printf("Status (0=Active, 1=Suspended, 2=Expired): ");
+    int s;
+    // Check if scanf got an integer AND range is valid
+    while (scanf("%d", &s) != 1 || s < 0 || s > 2)
+    {
+
+        while (getchar() != '\n')
+            ;
+        printf("Invalid status. Please enter 0, 1, or 2: ");
+    }
+    u->Status = s;
+
+    printf("Enter Role ID: ");
+    scanf("%s", u->ROLE_ID);
+
+    // VALIDATION 2: Check if Role Exists
+    if (FindRoleHash(u->ROLE_ID) == NULL)
+    {
+        printf("Error: Role ID not found.\n");
+        printf("User assigned to NO role.\n");
+        u->ROLE_ID[0] = '\0'; // Empty role
+    }
+    printf("Enter Organization ID: ");
+    scanf("%s", u->ORG_ID);
+    // VALIDATION 3: Check if Org Exists
+    if (FindOrganizationHash(u->ORG_ID) == NULL)
+    {
+        printf("Error: Organization ID not found.\n");
+        printf("User assigned to NO organization.\n");
+        u->ORG_ID[0] = '\0'; // Empty org
+    }
+
+    InsertUserHash(u);
+    printf("User added successfully.\n");
+}
+bool isValidPhone(char *phone)
+{
+    if (strlen(phone) != 10)
+        return false;
+    for (int i = 0; i < 10; i++)
+    {
+        if (phone[i] < '0' || phone[i] > '9')
+            return false;
+    }
+    return true;
+}
+
+void UpdateUserUI()
+{
+    char id[ID_Len];
+    printf("Enter User ID to update: ");
+    scanf("%10s", id);
+
+    User *u = FindUserHash(id);
+    if (u == NULL)
+    {
+        printf("User not found.\n");
+        return;
+    }
+
+    PrintUser(u);
+
+    printf("\nUpdate Options:\n");
+    printf("1. First Name\n2. Last Name\n3. Email\n4. Phone Number\n");
+    printf("5. Status\n6. Organization\n7. Role\n");
+    printf("Select option (1-7): ");
+
+    int choice;
+
+    while (scanf("%d", &choice) != 1 || choice < 1 || choice > 7)
+    {
+        // Clear buffer if they typed letters
+        while (getchar() != '\n')
+            ;
+        printf("Invalid selection. Please enter 1-7: ");
+    }
+
+    // 2. EXECUTION SWITCH
+    switch (choice)
+    {
+    case 1:
+        printf("New First Name: ");
+        scanf("%50s", u->FirstName);
+        printf("First Name updated.\n");
+        break;
+    case 2:
+        printf("New Last Name: ");
+        scanf("%50s", u->LastName);
+        printf("Last Name updated.\n");
+        break;
+    case 3:
+        printf("New Email: ");
+        scanf("%50s", u->Email);
+        printf("Email updated.\n");
+        break;
+    case 4:
+    {
+        char buffer[ID_Len + 5];
+        printf("New Phone Number: ");
+        scanf("%10s", buffer);
+
+        while (!isValidPhone(buffer))
+        {
+            printf("Invalid phone number. Please enter 10 digits: ");
+            scanf("%10s", buffer);
+        }
+        strcpy(u->PhoneNum, buffer);
+        printf("Phone Number updated.\n");
+        break;
+    }
+    case 5:
+    {
+        printf("New Status (0=Active, 1=Suspended, 2=Expired): ");
+        int s;
+        while (scanf("%d", &s) != 1 || s < 0 || s > 2)
+        {
+            while (getchar() != '\n')
+                ;
+            printf("Invalid status. Enter 0, 1, or 2: ");
+        }
+        u->Status = (AccountStatus)s;
+        printf("Status updated.\n");
+        break;
+    }
+    case 6:
+        printf("New Organization ID: ");
+        scanf("%s", u->ORG_ID);
+        // FIX: If Org doesn't exist, don't assign it (or set to empty)
+        if (FindOrganizationHash(u->ORG_ID) == NULL)
+        {
+            printf("Warning: Organization ID not found. Organization cleared.\n");
+            u->ORG_ID[0] = '\0';
+        }
+        else
+        {
+            printf("Organization updated.\n");
+        }
+        break;
+    case 7:
+        printf("New Role ID: ");
+        scanf("%s", u->ROLE_ID);
+        if (FindRoleHash(u->ROLE_ID) == NULL)
+        {
+            printf("Error: Role ID not found. Role cleared.\n");
+            u->ROLE_ID[0] = '\0';
+        }
+        else
+        {
+            printf("Role updated.\n");
+        }
+        break;
+    }
+}
+void DeleteUserUI()
+{
+    char id[ID_Len];
+    printf("Enter User ID to delete: ");
+    scanf("%s", id);
+    DeleteUserHash(id);
+    printf("User deleted (if existed).\n");
+}
+
+void ClearInputBuffer()
+{
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF)
+        ;
 }
