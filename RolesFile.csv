@@ -1,3 +1,8 @@
 Role_ID,RoleName,RoleDescription
-R_001,HTU_Student,A student at htu
-R_002,Employee,Employee at KHBP
+R001,Employee,Regular full-time employee with standard access
+R002,Manager,Department manager with extended access hours
+R003,Executive,Executive leadership with premium parking access
+R004,Security,Security personnel with 24/7 access to all zones
+R005,Contractor,Temporary contractor with limited access
+R006,Visitor,Guest visitor with restricted day-time access
+R007,Maintenance,Maintenance staff with service area access

@@ -1,2 +1,9 @@
 Gate_ID,gateName,gateStatus
-G_01,North-gate,0
+G001,Main_Entrance,0
+G002,North_Gate,0
+G003,South_Gate,0
+G004,East_Gate,0
+G005,West_Gate,0
+G006,Executive_Entrance,0
+G007,Loading_Dock_Gate,0
+G008,Service_Entrance,1

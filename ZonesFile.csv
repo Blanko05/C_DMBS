@@ -1,2 +1,9 @@
 Zone_ID,zoneName
-z_001,HTU-Zone
+Z001,Parking Lot A
+Z002,Parking Lot B
+Z003,Parking Lot C
+Z004,Executive Parking
+Z005,Visitor Parking
+Z006,HTU
+Z007,Service Area
+Z008,VIP Zone

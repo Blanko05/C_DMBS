@@ -3900,7 +3900,7 @@ void CreatePermissionUI()
         return;
     }
 
-    printf("Enter Allowed Days (e.g., 'Mon,Tue,Wed' or 'All'): ");
+    printf("Enter Allowed Days ('MonTueWed' ): ");
     scanf("%50s", p->AllowedDays);
 
     printf("Enter Start Time (HH:MM format, e.g., 08:00): ");
