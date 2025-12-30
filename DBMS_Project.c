@@ -257,6 +257,7 @@ Organization *ParseOrganizationLine(char *line);
 void SaveOrganizations(char *filename);
 
 int NextLogID = 1;
+int SystemLogID = 0;
 
 HashTable *UserTable = NULL;
 HashTable *VehicleTable = NULL;
@@ -323,6 +324,9 @@ void CreateGateZoneUI();
 void DeleteGateZoneUI();
 void PrintAllGateZones();
 void PrintGateZone(Gate_Zone *gz);
+
+void CreateLog(char *tableName, char *entityID, char *actionType, char *details);
+void InitializeSystemLog();
 
 int main()
 {
@@ -696,6 +700,8 @@ void DeleteUser(DLL *list, char *id)
         User *current = (User *)temp->data;
         if (!strcmp(current->User_ID, id))
         {
+            char userID[ID_Len];
+            strcpy(userID, current->User_ID);
 
             if (temp == list->head)
             {
@@ -724,6 +730,9 @@ void DeleteUser(DLL *list, char *id)
             list->size--;
             free(current);
             free(temp);
+            char details[Buffer_Size];
+            sprintf(details, "User %s deleted from system", userID);
+            CreateLog("User", userID, "DELETE", details);
             return;
         }
         temp = temp->next;
@@ -741,6 +750,8 @@ void DeleteRole(DLL *list, char *id)
         Role *current = (Role *)temp->data;
         if (!strcmp(current->Role_ID, id))
         {
+            char roleID[ID_Len];
+            strcpy(roleID, current->Role_ID);
             SetUsersRoleNULL(current->Role_ID);
             DeletePermissionsByRoleID(current->Role_ID);
             if (temp == list->head)
@@ -770,6 +781,9 @@ void DeleteRole(DLL *list, char *id)
             list->size--;
             free(current);
             free(temp);
+            char details[Buffer_Size];
+            sprintf(details, "Role %s deleted from system", roleID);
+            CreateLog("Role", roleID, "DELETE", details);
             return;
         }
         temp = temp->next;
@@ -787,6 +801,8 @@ void DeleteOrganization(DLL *list, char *id)
         Organization *current = (Organization *)temp->data;
         if (!strcmp(current->Org_ID, id))
         {
+            char orgID[ID_Len];
+            strcpy(orgID, current->Org_ID);
             SetUsersOrganizationNULL(current->Org_ID);
             if (temp == list->head)
             {
@@ -815,6 +831,9 @@ void DeleteOrganization(DLL *list, char *id)
             list->size--;
             free(current);
             free(temp);
+            char details[Buffer_Size];
+            sprintf(details, "Organization %s deleted from system", orgID);
+            CreateLog("Organization", orgID, "DELETE", details);
             return;
         }
         temp = temp->next;
@@ -830,6 +849,10 @@ void SetUsersRoleNULL(char *str)
             User *u = current->data;
             if (!strcmp(u->ROLE_ID, str))
             {
+                char details[Buffer_Size];
+                sprintf(details, "RoleID changed from '%s' to '%s'", u->ROLE_ID, "NULL");
+                CreateLog("User", u->User_ID, "UPDATE", details);
+
                 u->ROLE_ID[0] = '\0';
                 printf("User %s disassociated from role %s\n", u->User_ID, str);
             }
@@ -848,6 +871,9 @@ void SetUsersOrganizationNULL(char *str)
             User *u = current->data;
             if (!strcmp(u->ORG_ID, str))
             {
+                char details[Buffer_Size];
+                sprintf(details, "OrganizationID changed from '%s' to '%s'", u->ORG_ID, "NULL");
+                CreateLog("User", u->User_ID, "UPDATE", details);
                 u->ORG_ID[0] = '\0';
                 printf("User %s disassociated from Organization %s\n", u->User_ID, str);
             }
@@ -868,6 +894,8 @@ void DeleteZone(DLL *list, char *id)
         Zone *current = (Zone *)temp->data;
         if (!strcmp(current->Zone_ID, id))
         {
+            char zoneID[ID_Len];
+            strcpy(zoneID, current->Zone_ID);
             SetOrganizationZoneNULL(current->Zone_ID);
             DeleteGateZonesByZoneID(current->Zone_ID);
             DeletePermissionsByZoneID(current->Zone_ID);
@@ -898,6 +926,9 @@ void DeleteZone(DLL *list, char *id)
             list->size--;
             free(current);
             free(temp);
+            char details[Buffer_Size];
+            sprintf(details, "Zone %s deleted from system", zoneID);
+            CreateLog("Zone", zoneID, "DELETE", details);
             return;
         }
         temp = temp->next;
@@ -913,6 +944,9 @@ void SetOrganizationZoneNULL(char *str)
             Organization *org = (Organization *)current->data;
             if (!strcmp(org->ZONE_ID, str))
             {
+                char details[Buffer_Size];
+                sprintf(details, "ZONE_ID changed from '%s' to '%s'", org->ZONE_ID, "NULL");
+                CreateLog("Organization", org->Org_ID, "UPDATE", details);
                 org->ZONE_ID[0] = '\0';
                 printf("Warning: Organization %s dissociated from deleted Zone.\n", org->OrgName);
             }
@@ -933,6 +967,8 @@ void DeleteGate(DLL *list, char *id)
         Gate *current = (Gate *)temp->data;
         if (!strcmp(current->Gate_ID, id))
         {
+            char gateID[ID_Len];
+            strcpy(gateID, current->Gate_ID);
             DeleteGateZonesByGateID(current->Gate_ID);
             if (temp == list->head)
             {
@@ -961,6 +997,9 @@ void DeleteGate(DLL *list, char *id)
             list->size--;
             free(current);
             free(temp);
+            char details[Buffer_Size];
+            sprintf(details, "Gate %s deleted from system", gateID);
+            CreateLog("Gate", gateID, "DELETE", details);
             return;
         }
         temp = temp->next;
@@ -978,6 +1017,10 @@ void DeleteVehicle(DLL *list, char *licensePlate)
         Vehicle *current = (Vehicle *)temp->data;
         if (!strcmp(current->License_Plate, licensePlate))
         {
+            char ownerID[ID_Len];
+            strcpy(ownerID, current->USER_ID);
+            char plate[ID_Len];
+            strcpy(plate, current->License_Plate);
 
             if (temp == list->head)
             {
@@ -1006,6 +1049,9 @@ void DeleteVehicle(DLL *list, char *licensePlate)
             list->size--;
             free(current);
             free(temp);
+            char details[Buffer_Size];
+            sprintf(details, "Vehicle %s deleted owned by user %s", plate, ownerID);
+            CreateLog("Vehicle", plate, "DELETE", details);
             return;
         }
         temp = temp->next;
@@ -1712,6 +1758,13 @@ void DeleteGateZonesByGateID(char *gateID)
         Gate_Zone *gt = (Gate_Zone *)current->data;
         if (!strcmp(gt->GATE_ID, gateID))
         {
+            char details[Buffer_Size];
+            char comPri[30];
+            strcpy(comPri, gt->GATE_ID);
+            strcat(comPri, "-");
+            strcat(comPri, gt->ZONE_ID);
+            sprintf(details, "Gate_Zone link between Gate %s and Zone %s deleted from system", gt->GATE_ID, gt->ZONE_ID);
+            CreateLog("Gate_Zone", comPri, "DELETE", details);
             Delete(Gate_ZoneTable->buckets[index], current);
         }
         current = nextNode;
@@ -1728,6 +1781,13 @@ void DeletePermissionsByRoleID(char *roleID)
         Permissions *p = (Permissions *)current->data;
         if (!strcmp(p->Role_ID, roleID))
         {
+            char details[Buffer_Size];
+            char comPri[30];
+            strcpy(comPri, p->Role_ID);
+            strcat(comPri, "-");
+            strcat(comPri, p->ZONE_ID);
+            sprintf(details, "Permission link between Role %s and Zone %s deleted from system", p->Role_ID, p->ZONE_ID);
+            CreateLog("Permission", comPri, "DELETE", details);
             Delete(PermissionsTable->buckets[index], current);
         }
         current = nextNode;
@@ -1746,6 +1806,13 @@ void DeleteGateZonesByZoneID(char *zoneID)
             Gate_Zone *gt = current->data;
             if (!strcmp(gt->ZONE_ID, zoneID))
             {
+                char details[Buffer_Size];
+                char comPri[30];
+                strcpy(comPri, gt->GATE_ID);
+                strcat(comPri, "-");
+                strcat(comPri, gt->ZONE_ID);
+                sprintf(details, "Gate_Zone link between Gate %s and Zone %s deleted from system", gt->GATE_ID, gt->ZONE_ID);
+                CreateLog("Gate_Zone", comPri, "DELETE", details);
                 Delete(Gate_ZoneTable->buckets[i], current);
             }
             current = nextNode;
@@ -1764,6 +1831,13 @@ void DeletePermissionsByZoneID(char *zoneID)
             Permissions *p = current->data;
             if (!strcmp(p->ZONE_ID, zoneID))
             {
+                char details[Buffer_Size];
+                char comPri[30];
+                strcpy(comPri, p->Role_ID);
+                strcat(comPri, "-");
+                strcat(comPri, p->ZONE_ID);
+                sprintf(details, "Permission link between Role %s and Zone %s deleted from system", p->Role_ID, p->ZONE_ID);
+                CreateLog("Permission", comPri, "DELETE", details);
                 Delete(PermissionsTable->buckets[i], current);
             }
             current = nextNode;
@@ -2085,6 +2159,59 @@ void SaveAccessLog(char *filename)
     return;
 }
 
+void CreateLog(char *tableName, char *entityID, char *actionType, char *details)
+{
+    FILE *file = fopen("SystemLogs.csv", "a");
+    if (file == NULL)
+    {
+        printf("Couldn't open Logs file\n");
+        return;
+    }
+    time_t now = time(NULL);
+    struct tm *tm_info = localtime(&now);
+    char timestamp[20];
+    strftime(timestamp, 20, "%Y-%m-%d %H:%M:%S", tm_info);
+
+    SystemLogID++;
+
+    fprintf(file, "%d,%s,ADMIN,%s,%s,%s,%s\n",
+            SystemLogID,
+            timestamp,
+            tableName,
+            entityID,
+            actionType,
+            details);
+
+    fclose(file);
+    return;
+}
+void InitializeSystemLog()
+{
+    FILE *file = fopen("SystemLogs.csv", "r");
+    if (file == NULL)
+    {
+        return;
+    }
+    char line[Buffer_Size];
+    fgets(line, Buffer_Size, file);
+    int maxID = 0;
+    while (fgets(line, Buffer_Size, file) != NULL)
+    {
+        line[strcspn(line, "\n")] = 0;
+        char *token = strtok(line, ",");
+        if (token)
+        {
+            int logID = atoi(token);
+            if (logID > maxID)
+            {
+                maxID = logID;
+            }
+        }
+    }
+    SystemLogID = maxID;
+    fclose(file);
+    return;
+}
 void InitalizeBuffer()
 {
     UserTable = InitalizeTable();
@@ -2096,6 +2223,7 @@ void InitalizeBuffer()
     PermissionsTable = InitalizeTable();
     AccessLogTable = InitalizeTable();
     OrganizationTable = InitalizeTable();
+    InitializeSystemLog();
     return;
 }
 void LoadData()
@@ -2732,6 +2860,7 @@ void CreateUserUI()
 
     InsertUserHash(u);
     printf("✅ User added successfully.\n");
+    CreateLog("Users", u->User_ID, "CREATE", "New user created.");
 }
 
 bool isValidPhone(char *phone)
@@ -2780,25 +2909,35 @@ void UpdateUserUI()
         ClearInputBuffer();
         printf("Invalid selection. Enter 1-7: ");
     }
-
+    char temp[Name_Len];
+    char details[Buffer_Size];
     switch (choice)
     {
     case 1:
+        strcpy(temp, u->FirstName);
         printf("New First Name: ");
         scanf("%50s", u->FirstName);
         printf("✅ First Name updated.\n");
+        sprintf(details, "First Name changed from '%s' to '%s'", temp, u->FirstName);
+        CreateLog("Users", u->User_ID, "UPDATE", details);
         break;
 
     case 2:
+        strcpy(temp, u->LastName);
         printf("New Last Name: ");
         scanf("%50s", u->LastName);
         printf("✅ Last Name updated.\n");
+        sprintf(details, "Last Name changed from '%s' to '%s'", temp, u->LastName);
+        CreateLog("Users", u->User_ID, "UPDATE", details);
         break;
 
     case 3:
+        strcpy(temp, u->Email);
         printf("New Email: ");
         scanf("%50s", u->Email);
         printf("✅ Email updated.\n");
+        sprintf(details, "Email changed from '%s' to '%s'", temp, u->Email);
+        CreateLog("Users", u->User_ID, "UPDATE", details);
         break;
 
     case 4:
@@ -2812,8 +2951,11 @@ void UpdateUserUI()
             printf("❌ Invalid phone. Enter 10 digits: ");
             scanf("%10s", buffer);
         }
+        strcpy(details, u->PhoneNum);
         strcpy(u->PhoneNum, buffer);
         printf("✅ Phone Number updated.\n");
+        sprintf(details, "Phone Number changed from '%s' to '%s'", details, u->PhoneNum);
+        CreateLog("Users", u->User_ID, "UPDATE", details);
         break;
     }
 
@@ -2826,8 +2968,11 @@ void UpdateUserUI()
             ClearInputBuffer();
             printf("Invalid status. Enter 0, 1, or 2: ");
         }
+        int t = u->Status;
         u->Status = (AccountStatus)s;
         printf("✅ Status updated.\n");
+        sprintf(details, "Status changed from %d to '%d'", t, u->Status);
+        CreateLog("Users", u->User_ID, "UPDATE", details);
         break;
     }
 
@@ -2848,8 +2993,11 @@ void UpdateUserUI()
         }
         else
         {
+            strcpy(details, u->ORG_ID);
             strcpy(u->ORG_ID, buffer);
             printf("✅ Organization updated.\n");
+            sprintf(details, "Organization changed from '%s' to '%s'", details, u->ORG_ID);
+            CreateLog("Users", u->User_ID, "UPDATE", details);
         }
         break;
     }
@@ -2871,8 +3019,11 @@ void UpdateUserUI()
         }
         else
         {
+            strcpy(details, u->ROLE_ID);
             strcpy(u->ROLE_ID, buffer);
             printf("✅ Role updated.\n");
+            sprintf(details, "Role changed from '%s' to '%s'", details, u->ROLE_ID);
+            CreateLog("Users", u->User_ID, "UPDATE", details);
         }
         break;
     }
@@ -2911,6 +3062,7 @@ void DeleteUserUI()
         printf("🗑️  Deleting user and associated vehicles...\n");
         DeleteUserHash(id);
         printf("✅ User deleted successfully.\n");
+        CreateLog("Users", id, "DELETE", "User and associated vehicles deleted.");
     }
     else
     {
@@ -3039,6 +3191,7 @@ void CreateVehicleUI()
 
     InsertVehicleHash(v);
     printf("✅ Vehicle added successfully.\n");
+    CreateLog("Vehicles", v->License_Plate, "CREATE", "New vehicle created.");
 }
 
 void UpdateVehicleUI()
@@ -3073,20 +3226,30 @@ void UpdateVehicleUI()
         ClearInputBuffer();
         printf("Invalid. Enter 1-5: ");
     }
-
+    char temp[Name_Len];
+    char details[Buffer_Size];
     switch (choice)
     {
     case 1:
+        strcpy(temp, v->Make);
         printf("New Make: ");
         scanf("%50s", v->Make);
+        sprintf(details, "Make changed from '%s' to '%s'", temp, v->Make);
+        CreateLog("Vehicles", v->License_Plate, "UPDATE", details);
         break;
     case 2:
+        strcpy(temp, v->Model);
         printf("New Model: ");
         scanf("%50s", v->Model);
+        sprintf(details, "Model changed from '%s' to '%s'", temp, v->Model);
+        CreateLog("Vehicles", v->License_Plate, "UPDATE", details);
         break;
     case 3:
+        strcpy(temp, v->Color);
         printf("New Color: ");
         scanf("%50s", v->Color);
+        sprintf(details, "Color changed from '%s' to '%s'", temp, v->Color);
+        CreateLog("Vehicles", v->License_Plate, "UPDATE", details);
         break;
     case 4:
         printf("New Status (0=Active, 1=Stolen, 2=Sold): ");
@@ -3096,7 +3259,10 @@ void UpdateVehicleUI()
             ClearInputBuffer();
             printf("Invalid. Enter 0-2: ");
         }
+        int t = v->Status;
         v->Status = (VehicleStatus)s;
+        sprintf(details, "Status changed from %d to '%d'", t, v->Status);
+        CreateLog("Vehicles", v->License_Plate, "UPDATE", details);
         break;
     case 5:
         char newOwner[ID_Len];
@@ -3107,7 +3273,9 @@ void UpdateVehicleUI()
             printf("❌ User not found. Owner unchanged.\n");
             return;
         }
+        sprintf(details, "Owner changed from '%s' to '%s'", v->USER_ID, newOwner);
         strcpy(v->USER_ID, newOwner);
+        CreateLog("Vehicles", v->License_Plate, "UPDATE", details);
         break;
     }
     printf("✅ Updated successfully.\n");
@@ -3222,6 +3390,7 @@ void CreateRoleUI()
 
     InsertRoleHash(r);
     printf("✅ Role added successfully.\n");
+    CreateLog("Roles", r->Role_ID, "CREATE", "New role created.");
 }
 
 void UpdateRoleUI()
@@ -3246,18 +3415,25 @@ void UpdateRoleUI()
         ClearInputBuffer();
         printf("Invalid. Enter 1 or 2: ");
     }
-
+    char temp[Buffer_Size];
+    char details[Buffer_Size];
     if (choice == 1)
     {
+        strcpy(temp, r->RoleName);
         printf("New Name: ");
         scanf("%50s", r->RoleName);
+        sprintf(details, "Role Name changed from '%s' to '%s'", temp, r->RoleName);
+        CreateLog("Roles", r->Role_ID, "UPDATE", details);
     }
     else
     {
         ClearInputBuffer();
         printf("New Description: ");
+        strcpy(temp, r->RoleDescription);
         fgets(r->RoleDescription, 201, stdin);
         r->RoleDescription[strcspn(r->RoleDescription, "\n")] = 0;
+        sprintf(details, "Role Description changed from '%s' to '%s'", temp, r->RoleDescription);
+        CreateLog("Roles", r->Role_ID, "UPDATE", details);
     }
     printf("✅ Updated successfully.\n");
 }
@@ -3396,6 +3572,7 @@ void CreateOrganizationUI()
 
     InsertOrganizationHash(o);
     printf("✅ Organization added.\n");
+    CreateLog("Organizations", o->Org_ID, "CREATE", "New organization created.");
 }
 
 void UpdateOrganizationUI()
@@ -3420,25 +3597,34 @@ void UpdateOrganizationUI()
         ClearInputBuffer();
         printf("Invalid. Enter 1-3: ");
     }
-
+    char temp[Name_Len];
+    char details[Buffer_Size];
     switch (choice)
     {
     case 1:
+        strcpy(temp, o->OrgName);
         printf("New Name: ");
         scanf("%50s", o->OrgName);
+        sprintf(details, "Organization Name changed from '%s' to '%s'", temp, o->OrgName);
+        CreateLog("Organizations", o->Org_ID, "UPDATE", details);
         break;
     case 2:
+        strcpy(temp, o->Type);
         printf("New Type: ");
         scanf("%50s", o->Type);
+        sprintf(details, "Organization Type changed from '%s' to '%s'", temp, o->Type);
+        CreateLog("Organizations", o->Org_ID, "UPDATE", details);
         break;
     case 3:
         char zone[ID_Len];
         printf("New Zone ID (or 'none'): ");
         scanf("%10s", zone);
-
+        strcpy(temp, o->ZONE_ID);
         if (strcmp(zone, "none") == 0)
         {
             o->ZONE_ID[0] = '\0';
+            sprintf(details, "Organization Zone changed from '%s' to 'none'", temp);
+            CreateLog("Organizations", o->Org_ID, "UPDATE", details);
         }
         else if (FindZoneHash(zone) == NULL)
         {
@@ -3448,6 +3634,8 @@ void UpdateOrganizationUI()
         else
         {
             strcpy(o->ZONE_ID, zone);
+            sprintf(details, "Organization Zone changed from '%s' to '%s'", temp, o->ZONE_ID);
+            CreateLog("Organizations", o->Org_ID, "UPDATE", details);
         }
         break;
     }
@@ -3559,6 +3747,7 @@ void CreateZoneUI()
 
     InsertZoneHash(z);
     printf("✅ Zone added.\n");
+    CreateLog("Zones", z->Zone_ID, "CREATE", "New zone created.");
 }
 
 void UpdateZoneUI()
@@ -3576,8 +3765,13 @@ void UpdateZoneUI()
 
     PrintZone(z);
     printf("\nNew Zone Name: ");
+    char temp[Name_Len];
+    strcpy(temp, z->ZoneName);
     scanf("%50s", z->ZoneName);
     printf("✅ Updated.\n");
+    char details[Buffer_Size];
+    sprintf(details, "Zone Name changed from '%s' to '%s'", temp, z->ZoneName);
+    CreateLog("Zones", z->Zone_ID, "UPDATE", details);
 }
 
 void DeleteZoneUI()
@@ -3694,6 +3888,7 @@ void CreateGateUI()
 
     InsertGateHash(g);
     printf("✅ Gate added.\n");
+    CreateLog("Gates", g->Gate_ID, "CREATE", "New gate created.");
 }
 
 void UpdateGateUI()
@@ -3718,11 +3913,15 @@ void UpdateGateUI()
         ClearInputBuffer();
         printf("Invalid. Enter 1-2: ");
     }
-
+    char temp[Name_Len];
+    char details[Buffer_Size];
     if (choice == 1)
     {
+        strcpy(temp, g->gateName);
         printf("New Name: ");
         scanf("%50s", g->gateName);
+        sprintf(details, "Gate Name changed from '%s' to '%s'", temp, g->gateName);
+        CreateLog("Gates", g->Gate_ID, "UPDATE", details);
     }
     else
     {
@@ -3733,7 +3932,10 @@ void UpdateGateUI()
             ClearInputBuffer();
             printf("Invalid. Enter 0-2: ");
         }
+        int t = g->gateStatus;
         g->gateStatus = (GateStatus)s;
+        sprintf(details, "Gate Status changed from %d to '%d'", t, g->gateStatus);
+        CreateLog("Gates", g->Gate_ID, "UPDATE", details);
     }
     printf("✅ Updated.\n");
 }
@@ -3923,6 +4125,11 @@ void CreatePermissionUI()
 
     InsertPermissionHash(p);
     printf("✅ Permission added successfully.\n");
+    char comPri[30];
+    strcpy(comPri, p->Role_ID);
+    strcat(comPri, "-");
+    strcat(comPri, p->ZONE_ID);
+    CreateLog("Permissions", comPri, "CREATE", "New permission created.");
 }
 
 void DeletePermissionUI()
@@ -4126,6 +4333,11 @@ void CreateGateZoneUI()
 
     InsertGate_ZoneHash(gz);
     printf("✅ Gate-Zone link created successfully.\n");
+    char comPri[30];
+    strcpy(comPri, gz->GATE_ID);
+    strcat(comPri, "-");
+    strcat(comPri, gz->ZONE_ID);
+    CreateLog("Gate_Zone", comPri, "CREATE", "New gate-zone link created.");
 
     Gate *g = FindGateHash(gz->GATE_ID);
     Zone *z = FindZoneHash(gz->ZONE_ID);

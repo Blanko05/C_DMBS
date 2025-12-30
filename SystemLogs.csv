@@ -1,0 +1,2 @@
+LogID,TimeStamp,UserID,TableName,EntityID,ActionType,Details
+1,2025-12-30 02:46:08,ADMIN,Users,U-32,CREATE,New user created.
