@@ -4,15 +4,14 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <time.h>
+#include <pthread.h>
+#include <unistd.h>
 
 #define ID_Len 11
 #define Name_Len 51
 #define Buffer_Size 512
 #define Table_Size 50
 
-/*
-    Defining Entites: Start
-*/
 typedef enum
 {
     ACC_ACTIVE,
@@ -126,6 +125,52 @@ typedef struct
     char Reason[Name_Len];
 } Access_Log;
 
+// --- CONCURRENCY STRUCTURES ---
+typedef enum
+{
+    LOCK_FREE,
+    LOCK_SHARED,
+    LOCK_EXCLUSIVE
+} LockState;
+
+// 1. Enum for array indexing (Makes code readable)
+typedef enum
+{
+    TABLE_USERS = 0,
+    TABLE_VEHICLES,
+    TABLE_GATES,
+    TABLE_ZONES,
+    TABLE_ROLES,
+    TABLE_PERMISSIONS,
+    TABLE_ORGANIZATIONS,
+    TABLE_GATE_ZONES,
+    TABLE_ACCESS_LOGS,
+    TABLE_SYSTEM_LOGS,
+    TABLE_COUNT // Automatically counts them (9)
+} TableIndex;
+
+typedef struct
+{
+    char tableName[50];
+    LockState state;
+    int activeReaders;
+    int waitingWriters;
+
+    pthread_mutex_t mutex;
+    pthread_cond_t canRead;
+    pthread_cond_t canWrite;
+} TableLock;
+
+// 2. The Actual "Lock Table"
+TableLock LockManager[TABLE_COUNT];
+void InitializeLockTable();
+void InitLock(TableLock *lock, char *name);
+void AcquireSharedLock(TableLock *lock);
+void AcquireExclusiveLock(TableLock *lock);
+void ReleaseLock(TableLock *lock);
+void *WriterTask(void *arg);
+void *ReaderTask(void *arg);
+void SimulateConcurrency();
 /*
     Defining Entites: End
 */
@@ -417,6 +462,7 @@ void Delete(DLL *list, Node *node)
 
 void PrintAllUsers()
 {
+    AcquireSharedLock(&LockManager[TABLE_USERS]);
     for (int i = 0; i < Table_Size; i++)
     {
         Node *temp = UserTable->buckets[i]->head;
@@ -424,13 +470,16 @@ void PrintAllUsers()
         {
             User *u = (User *)temp->data;
             PrintUser(u);
+            printf("----------------------\n");
             temp = temp->next;
         }
     }
+    ReleaseLock(&LockManager[TABLE_USERS]);
     return;
 }
 void PrintAllRoles()
 {
+    AcquireSharedLock(&LockManager[TABLE_ROLES]);
     for (int i = 0; i < Table_Size; i++)
     {
         Node *temp = RoleTable->buckets[i]->head;
@@ -438,13 +487,16 @@ void PrintAllRoles()
         {
             Role *r = (Role *)temp->data;
             PrintRole(r);
+            printf("----------------------\n");
             temp = temp->next;
         }
     }
+    ReleaseLock(&LockManager[TABLE_ROLES]);
     return;
 }
 void PrintAllOrganizations()
 {
+    AcquireSharedLock(&LockManager[TABLE_ORGANIZATIONS]);
     for (int i = 0; i < Table_Size; i++)
     {
         Node *temp = OrganizationTable->buckets[i]->head;
@@ -452,13 +504,16 @@ void PrintAllOrganizations()
         {
             Organization *o = (Organization *)temp->data;
             PrintOrganization(o);
+            printf("----------------------\n");
             temp = temp->next;
         }
     }
+    ReleaseLock(&LockManager[TABLE_ORGANIZATIONS]);
     return;
 }
 void PrintAllZones()
 {
+    AcquireSharedLock(&LockManager[TABLE_ZONES]);
     for (int i = 0; i < Table_Size; i++)
     {
         Node *temp = ZoneTable->buckets[i]->head;
@@ -466,13 +521,16 @@ void PrintAllZones()
         {
             Zone *z = (Zone *)temp->data;
             PrintZone(z);
+            printf("----------------------\n");
             temp = temp->next;
         }
     }
+    ReleaseLock(&LockManager[TABLE_ZONES]);
     return;
 }
 void PrintAllGates()
 {
+    AcquireSharedLock(&LockManager[TABLE_GATES]);
     for (int i = 0; i < Table_Size; i++)
     {
         Node *temp = GateTable->buckets[i]->head;
@@ -480,13 +538,16 @@ void PrintAllGates()
         {
             Gate *g = (Gate *)temp->data;
             PrintGate(g);
+            printf("----------------------\n");
             temp = temp->next;
         }
     }
+    ReleaseLock(&LockManager[TABLE_GATES]);
     return;
 }
 void PrintAllVehicles()
 {
+    AcquireSharedLock(&LockManager[TABLE_VEHICLES]);
     for (int i = 0; i < Table_Size; i++)
     {
         Node *temp = VehicleTable->buckets[i]->head;
@@ -494,9 +555,11 @@ void PrintAllVehicles()
         {
             Vehicle *v = (Vehicle *)temp->data;
             PrintVehicle(v);
+            printf("----------------------\n");
             temp = temp->next;
         }
     }
+    ReleaseLock(&LockManager[TABLE_VEHICLES]);
     return;
 }
 User *FindUser(DLL *list, char *id)
@@ -1097,7 +1160,6 @@ void LoadUsers(char *filename)
         }
     }
     fclose(file);
-    printf("loaded Users successfully!\n");
     return;
 }
 void LoadRoles(char *filename)
@@ -1124,7 +1186,6 @@ void LoadRoles(char *filename)
         }
     }
     fclose(file);
-    printf("loaded Roles successfully!\n");
     return;
 }
 void LoadOrganizations(char *filename)
@@ -1151,7 +1212,6 @@ void LoadOrganizations(char *filename)
         }
     }
     fclose(file);
-    printf("loaded Organizations successfully!\n");
     return;
 }
 void LoadZones(char *filename)
@@ -1178,7 +1238,6 @@ void LoadZones(char *filename)
         }
     }
     fclose(file);
-    printf("loaded Zones successfully!\n");
     return;
 }
 void LoadGates(char *filename)
@@ -1205,7 +1264,6 @@ void LoadGates(char *filename)
         }
     }
     fclose(file);
-    printf("loaded Gates successfully!\n");
     return;
 }
 void LoadVehicles(char *filename)
@@ -1240,7 +1298,6 @@ void LoadVehicles(char *filename)
         }
     }
     fclose(file);
-    printf("loaded Vehicles successfully!\n");
     return;
 }
 User *ParseUserLine(char *line)
@@ -1415,7 +1472,6 @@ void SaveUsers(char *filename)
     }
 
     fclose(file);
-    printf("Data Saved Succcessfully to %s\n", filename);
 }
 void SaveGates(char *filename)
 {
@@ -1441,7 +1497,6 @@ void SaveGates(char *filename)
     }
 
     fclose(file);
-    printf("Data Saved Succcessfully to %s\n", filename);
 }
 void SaveZones(char *filename)
 {
@@ -1466,7 +1521,6 @@ void SaveZones(char *filename)
     }
 
     fclose(file);
-    printf("Data Saved Succcessfully to %s\n", filename);
 }
 void SaveRoles(char *filename)
 {
@@ -1492,7 +1546,6 @@ void SaveRoles(char *filename)
     }
 
     fclose(file);
-    printf("Data Saved Succcessfully to %s\n", filename);
 }
 void SaveOrganizations(char *filename)
 {
@@ -1519,7 +1572,6 @@ void SaveOrganizations(char *filename)
     }
 
     fclose(file);
-    printf("Data Saved Succcessfully to %s\n", filename);
 }
 void SaveVehicles(char *filename)
 {
@@ -1548,7 +1600,6 @@ void SaveVehicles(char *filename)
     }
 
     fclose(file);
-    printf("Data Saved Succcessfully to %s\n", filename);
 }
 
 int Hash(char *str)
@@ -1882,7 +1933,6 @@ void LoadGate_Zone(char *filename)
         }
     }
     fclose(file);
-    printf("loaded Gates_Zones successfully!\n");
     return;
 }
 Gate_Zone *ParseGate_ZoneLine(char *line)
@@ -1924,7 +1974,6 @@ void SaveGateZone(char *filename)
     }
 
     fclose(file);
-    printf("Data Saved Succcessfully to %s\n", filename);
 }
 void LoadPermissions(char *filename)
 {
@@ -1958,7 +2007,6 @@ void LoadPermissions(char *filename)
         }
     }
     fclose(file);
-    printf("loaded Permissions successfully!\n");
     return;
 }
 Permissions *ParsePermissionsLine(char *line)
@@ -2012,7 +2060,6 @@ void SavePermissions(char *filename)
     }
 
     fclose(file);
-    printf("Data Saved Succcessfully to %s\n", filename);
 }
 
 void InsertAccessLogHash(Access_Log *log)
@@ -2023,6 +2070,7 @@ void InsertAccessLogHash(Access_Log *log)
 }
 void AddLogEntry(char *licensePlate, char *gateID, Outcome outcome, char *reason)
 {
+    AcquireExclusiveLock(&LockManager[TABLE_ACCESS_LOGS]);
     Access_Log *log = calloc(1, sizeof(Access_Log));
     log->Log_ID = NextLogID++;
     strcpy(log->License_Plate, licensePlate);
@@ -2037,6 +2085,7 @@ void AddLogEntry(char *licensePlate, char *gateID, Outcome outcome, char *reason
     InsertAccessLogHash(log);
     printf("[LOG] %s: %s at %s -> %s (%s)\n", log->TimeStamp, licensePlate, gateID,
            outcome == Granted ? "GRANTED" : "DENIED", reason);
+    ReleaseLock(&LockManager[TABLE_ACCESS_LOGS]);
     return;
 }
 void printAccessLog(Access_Log *log)
@@ -2060,6 +2109,7 @@ void printAccessLog(Access_Log *log)
 }
 void printAllAccessLog()
 {
+    AcquireSharedLock(&LockManager[TABLE_ACCESS_LOGS]);
     for (int i = 0; i < Table_Size; i++)
     {
         Node *current = AccessLogTable->buckets[i]->head;
@@ -2070,6 +2120,7 @@ void printAllAccessLog()
             current = current->next;
         }
     }
+    ReleaseLock(&LockManager[TABLE_ACCESS_LOGS]);
     return;
 }
 
@@ -2097,7 +2148,6 @@ void LoadAccessLog(char *filename)
         }
     }
     fclose(file);
-    printf("loaded Access Logs successfully!\n");
     return;
 }
 Access_Log *ParseAccessLogLine(char *line)
@@ -2144,7 +2194,7 @@ void SaveAccessLog(char *filename)
         while (current != NULL)
         {
             Access_Log *log = (Access_Log *)current->data;
-            fprintf(file, "%d,%s,%s,%s,%d,%s",
+            fprintf(file, "%d,%s,%s,%s,%d,%s\n",
                     log->Log_ID,
                     log->License_Plate,
                     log->GATE_ID,
@@ -2155,12 +2205,12 @@ void SaveAccessLog(char *filename)
         }
     }
     fclose(file);
-    printf("Data Saved Succcessfully to %s\n", filename);
     return;
 }
 
 void CreateLog(char *tableName, char *entityID, char *actionType, char *details)
 {
+    AcquireExclusiveLock(&LockManager[TABLE_SYSTEM_LOGS]);
     FILE *file = fopen("SystemLogs.csv", "a");
     if (file == NULL)
     {
@@ -2183,6 +2233,7 @@ void CreateLog(char *tableName, char *entityID, char *actionType, char *details)
             details);
 
     fclose(file);
+    ReleaseLock(&LockManager[TABLE_SYSTEM_LOGS]);
     return;
 }
 void InitializeSystemLog()
@@ -2212,8 +2263,95 @@ void InitializeSystemLog()
     fclose(file);
     return;
 }
+
+// --- LOCK MANAGER FUNCTIONS ---
+
+void InitLock(TableLock *lock, char *name)
+{
+    strcpy(lock->tableName, name);
+    lock->state = LOCK_FREE;
+    lock->activeReaders = 0;
+    lock->waitingWriters = 0;
+
+    // Initialize the mutex and condition variables
+    pthread_mutex_init(&lock->mutex, NULL);
+    pthread_cond_init(&lock->canRead, NULL);
+    pthread_cond_init(&lock->canWrite, NULL);
+}
+void InitializeLockTable()
+{
+    char *names[] = {
+        "Users", "Vehicles", "Gates", "Zones", "Roles",
+        "Permissions", "Organizations", "GateZones", "AccessLogs", "SystemLogs"};
+
+    for (int i = 0; i < TABLE_COUNT; i++)
+    {
+        InitLock(&LockManager[i], names[i]);
+    }
+}
+
+void AcquireSharedLock(TableLock *lock)
+{
+    pthread_mutex_lock(&lock->mutex); // Grab Key
+
+    // Wait if a Writer is active OR waiting (Priority to Writers)
+    while (lock->state == LOCK_EXCLUSIVE || lock->waitingWriters > 0)
+    {
+        pthread_cond_wait(&lock->canRead, &lock->mutex);
+    }
+
+    lock->activeReaders++;
+    lock->state = LOCK_SHARED;
+
+    pthread_mutex_unlock(&lock->mutex); // Return Key
+}
+
+void AcquireExclusiveLock(TableLock *lock)
+{
+    pthread_mutex_lock(&lock->mutex); // Grab Key
+
+    lock->waitingWriters++; // Join the line
+
+    // Wait if ANYONE is inside
+    while (lock->activeReaders > 0 || lock->state != LOCK_FREE)
+    {
+        pthread_cond_wait(&lock->canWrite, &lock->mutex);
+    }
+
+    lock->waitingWriters--; // Leave the line
+    lock->state = LOCK_EXCLUSIVE;
+
+    pthread_mutex_unlock(&lock->mutex); // Return Key
+}
+
+void ReleaseLock(TableLock *lock)
+{
+    pthread_mutex_lock(&lock->mutex); // Grab Key
+
+    if (lock->state == LOCK_EXCLUSIVE)
+    {
+        // Writer leaving
+        lock->state = LOCK_FREE;
+        pthread_cond_broadcast(&lock->canRead); // Wake ALL readers
+        pthread_cond_signal(&lock->canWrite);   // Wake ONE writer
+    }
+    else if (lock->state == LOCK_SHARED)
+    {
+        // Reader leaving
+        lock->activeReaders--;
+        if (lock->activeReaders == 0)
+        {
+            lock->state = LOCK_FREE;
+            pthread_cond_signal(&lock->canWrite); // Wake ONE writer
+        }
+    }
+
+    pthread_mutex_unlock(&lock->mutex); // Return Key
+}
+
 void InitalizeBuffer()
 {
+    InitializeLockTable();
     UserTable = InitalizeTable();
     VehicleTable = InitalizeTable();
     ZoneTable = InitalizeTable();
@@ -2307,60 +2445,80 @@ bool CheckDay(char *allowed, char *today)
 
 bool validateEntry(char *licensePlate, char *gateID)
 {
+    AcquireSharedLock(&LockManager[TABLE_VEHICLES]);
     Vehicle *v = FindVehicleHash(licensePlate);
     if (v == NULL)
     {
         AddLogEntry(licensePlate, gateID, 1, "Vehicle is NOT found.");
+        ReleaseLock(&LockManager[TABLE_VEHICLES]);
         return false;
     }
     if (v->Status == 1)
     {
         AddLogEntry(licensePlate, gateID, 1, "Vehicle is Stolen.");
+        ReleaseLock(&LockManager[TABLE_VEHICLES]);
         return false;
     }
     if (v->Status == 2)
     {
         AddLogEntry(licensePlate, gateID, 1, "Vehicle is Sold.");
+        ReleaseLock(&LockManager[TABLE_VEHICLES]);
         return false;
     }
+    ReleaseLock(&LockManager[TABLE_VEHICLES]);
+    AcquireSharedLock(&LockManager[TABLE_USERS]);
     User *u = FindUserHash(v->USER_ID);
     if (u == NULL)
     {
         AddLogEntry(licensePlate, gateID, 1, "Vehicle does not belong to a User.");
+        ReleaseLock(&LockManager[TABLE_USERS]);
         return false;
     }
     if (u->Status == 1)
     {
         AddLogEntry(licensePlate, gateID, 1, "User Account Suspended.");
+        ReleaseLock(&LockManager[TABLE_USERS]);
         return false;
     }
     if (u->Status == 2)
     {
         AddLogEntry(licensePlate, gateID, 1, "User Account Expired.");
+        ReleaseLock(&LockManager[TABLE_USERS]);
         return false;
     }
+    ReleaseLock(&LockManager[TABLE_USERS]);
+    AcquireSharedLock(&LockManager[TABLE_ROLES]);
     Role *r = FindRoleHash(u->ROLE_ID);
     if (r == NULL)
     {
         AddLogEntry(licensePlate, gateID, 1, "Invalid User Role.");
+        ReleaseLock(&LockManager[TABLE_ROLES]);
         return false;
     }
+    ReleaseLock(&LockManager[TABLE_ROLES]);
+    AcquireSharedLock(&LockManager[TABLE_GATES]);
     Gate *g = FindGateHash(gateID);
     if (g == NULL)
     {
         AddLogEntry(licensePlate, gateID, 1, "Invalid Gate.");
+        ReleaseLock(&LockManager[TABLE_GATES]);
         return false;
     }
     if (g->gateStatus == 1)
     {
         AddLogEntry(licensePlate, gateID, 1, "Gate Closed.");
+        ReleaseLock(&LockManager[TABLE_GATES]);
         return false;
     }
     if (g->gateStatus == 2)
     {
         AddLogEntry(licensePlate, gateID, 1, "Gate under Maintenance.");
+        ReleaseLock(&LockManager[TABLE_GATES]);
         return false;
     }
+    ReleaseLock(&LockManager[TABLE_GATES]);
+    AcquireSharedLock(&LockManager[TABLE_GATE_ZONES]);
+    AcquireSharedLock(&LockManager[TABLE_PERMISSIONS]);
     DLL *gate_zonelist = GetGateZoneBucket(gateID);
     Node *temp = gate_zonelist->head;
     Permissions *p = NULL;
@@ -2380,6 +2538,8 @@ bool validateEntry(char *licensePlate, char *gateID)
     if (p == NULL)
     {
         AddLogEntry(licensePlate, gateID, 1, "No Permission for this Zone.");
+        ReleaseLock(&LockManager[TABLE_GATE_ZONES]);
+        ReleaseLock(&LockManager[TABLE_PERMISSIONS]);
         return false;
     }
     time_t now = time(NULL);
@@ -2396,15 +2556,21 @@ bool validateEntry(char *licensePlate, char *gateID)
     if (!CheckDay(p->AllowedDays, cDay))
     {
         AddLogEntry(licensePlate, gateID, 1, "Restricted Day.");
+        ReleaseLock(&LockManager[TABLE_GATE_ZONES]);
+        ReleaseLock(&LockManager[TABLE_PERMISSIONS]);
         return false;
     }
     if (currentTime > endTime || currentTime < startTime)
     {
         AddLogEntry(licensePlate, gateID, 1, "Restricted Time.");
+        ReleaseLock(&LockManager[TABLE_GATE_ZONES]);
+        ReleaseLock(&LockManager[TABLE_PERMISSIONS]);
         return false;
     }
 
     AddLogEntry(licensePlate, gateID, 0, "Access Granted.");
+    ReleaseLock(&LockManager[TABLE_GATE_ZONES]);
+    ReleaseLock(&LockManager[TABLE_PERMISSIONS]);
     return true;
 }
 
@@ -2419,7 +2585,8 @@ void SystemUI()
         printf("║ 1. [SIMULATION] Entry Request         ║\n");
         printf("║ 2. [ADMIN]      Database Management   ║\n");
         printf("║ 3. [REPORTS]    Access Logs           ║\n");
-        printf("║ 4. Save & Exit                        ║\n");
+        printf("║ 4. Simulate Concurrency               ║\n");
+        printf("║ 5. Save & Exit                        ║\n");
         printf("╚═══════════════════════════════════════╝\n");
         printf("Select option: ");
 
@@ -2441,12 +2608,15 @@ void SystemUI()
             ViewLogsMenu();
             break;
         case 4:
-            printf("\n💾 Saving data and exiting...\n");
+            SimulateConcurrency();
             break;
+        case 5:
+            printf("\n💾 Saving data and exiting...\n");
+            return;
         default:
             printf("❌ Invalid selection. Please choose 1-4.\n");
         }
-    } while (choice != 4);
+    } while (choice != 5);
 }
 
 void SimulationMenu()
@@ -2516,7 +2686,7 @@ void ViewLogsMenu()
             char plate[ID_Len];
             printf("Enter License Plate: ");
             scanf("%10s", plate);
-
+            AcquireSharedLock(&LockManager[TABLE_ACCESS_LOGS]);
             printf("\n═══ LOGS FOR PLATE: %s ═══\n", plate);
             int index = Hash(plate);
             Node *current = AccessLogTable->buckets[index]->head;
@@ -2536,6 +2706,7 @@ void ViewLogsMenu()
 
             if (!found)
                 printf("📭 No logs found for %s\n", plate);
+            ReleaseLock(&LockManager[TABLE_ACCESS_LOGS]);
             break;
         }
 
@@ -2544,7 +2715,7 @@ void ViewLogsMenu()
             char gateID[ID_Len];
             printf("Enter Gate ID: ");
             scanf("%10s", gateID);
-
+            AcquireSharedLock(&LockManager[TABLE_ACCESS_LOGS]);
             printf("\n═══ LOGS FOR GATE: %s ═══\n", gateID);
             bool found = false;
 
@@ -2566,6 +2737,7 @@ void ViewLogsMenu()
 
             if (!found)
                 printf("📭 No logs found for gate %s\n", gateID);
+            ReleaseLock(&LockManager[TABLE_ACCESS_LOGS]);
             break;
         }
 
@@ -2581,7 +2753,7 @@ void ViewLogsMenu()
 
             printf("\n═══ %s ATTEMPTS ═══\n", outcome == 0 ? "GRANTED" : "DENIED");
             bool found = false;
-
+            AcquireSharedLock(&LockManager[TABLE_ACCESS_LOGS]);
             for (int i = 0; i < Table_Size; i++)
             {
                 Node *current = AccessLogTable->buckets[i]->head;
@@ -2600,13 +2772,12 @@ void ViewLogsMenu()
 
             if (!found)
                 printf("📭 No %s logs found\n", outcome == 0 ? "granted" : "denied");
+            ReleaseLock(&LockManager[TABLE_ACCESS_LOGS]);
             break;
         }
-
         case 5:
             printf("Returning to main menu...\n");
-            return;
-
+            break;
         default:
             printf("❌ Invalid selection.\n");
         }
@@ -2726,10 +2897,13 @@ void PrintUserUI()
     printf("Enter User ID: ");
     scanf("%10s", buffer);
 
+    AcquireSharedLock(&LockManager[TABLE_USERS]);
+
     User *found = FindUserHash(buffer);
     if (found == NULL)
     {
         printf("❌ User not found.\n");
+        ReleaseLock(&LockManager[TABLE_USERS]);
         return;
     }
 
@@ -2739,23 +2913,28 @@ void PrintUserUI()
     // Show additional relationship info
     if (found->ROLE_ID[0] != '\0')
     {
+        AcquireSharedLock(&LockManager[TABLE_ROLES]);
         Role *r = FindRoleHash(found->ROLE_ID);
         if (r != NULL)
         {
             printf("🎭 Role: %s\n", r->RoleName);
         }
+        ReleaseLock(&LockManager[TABLE_ROLES]);
     }
 
     if (found->ORG_ID[0] != '\0')
     {
+        AcquireSharedLock(&LockManager[TABLE_ORGANIZATIONS]);
         Organization *o = FindOrganizationHash(found->ORG_ID);
         if (o != NULL)
         {
             printf("🏢 Organization: %s\n", o->OrgName);
         }
+        ReleaseLock(&LockManager[TABLE_ORGANIZATIONS]);
     }
 
     // Count user's vehicles
+    AcquireSharedLock(&LockManager[TABLE_VEHICLES]);
     int vehicleCount = 0;
     for (int i = 0; i < Table_Size; i++)
     {
@@ -2771,6 +2950,8 @@ void PrintUserUI()
         }
     }
     printf("🚗 Total Vehicles: %d\n", vehicleCount);
+    ReleaseLock(&LockManager[TABLE_VEHICLES]);
+    ReleaseLock(&LockManager[TABLE_USERS]);
 }
 
 void CreateUserUI()
@@ -2782,12 +2963,15 @@ void CreateUserUI()
     scanf("%10s", buffer);
 
     // VALIDATION 1: Check if ID exists
+    AcquireSharedLock(&LockManager[TABLE_USERS]);
     if (FindUserHash(buffer) != NULL)
     {
         printf("❌ Error: User ID already exists!\n");
         free(u);
+        ReleaseLock(&LockManager[TABLE_USERS]);
         return;
     }
+    ReleaseLock(&LockManager[TABLE_USERS]);
     strcpy(u->User_ID, buffer);
 
     printf("Enter First Name: ");
@@ -2827,6 +3011,7 @@ void CreateUserUI()
     }
     else
     {
+        AcquireSharedLock(&LockManager[TABLE_ROLES]);
         if (FindRoleHash(buffer) == NULL)
         {
             printf("⚠️  Role not found. User created without role.\n");
@@ -2836,6 +3021,7 @@ void CreateUserUI()
         {
             strcpy(u->ROLE_ID, buffer);
         }
+        ReleaseLock(&LockManager[TABLE_ROLES]);
     }
 
     printf("Enter Organization ID (or 'none' to skip): ");
@@ -2847,6 +3033,7 @@ void CreateUserUI()
     }
     else
     {
+        AcquireSharedLock(&LockManager[TABLE_ORGANIZATIONS]);
         if (FindOrganizationHash(buffer) == NULL)
         {
             printf("⚠️  Organization not found. User created without org.\n");
@@ -2856,9 +3043,18 @@ void CreateUserUI()
         {
             strcpy(u->ORG_ID, buffer);
         }
+        ReleaseLock(&LockManager[TABLE_ORGANIZATIONS]);
     }
-
+    AcquireExclusiveLock(&LockManager[TABLE_USERS]);
+    if (FindUserHash(u->User_ID) != NULL)
+    {
+        printf("❌ Error: User ID already exists! (It was taken while you were typing)\n");
+        free(u);
+        ReleaseLock(&LockManager[TABLE_USERS]);
+        return;
+    }
     InsertUserHash(u);
+    ReleaseLock(&LockManager[TABLE_USERS]);
     printf("✅ User added successfully.\n");
     CreateLog("Users", u->User_ID, "CREATE", "New user created.");
 }
@@ -2881,10 +3077,13 @@ void UpdateUserUI()
     printf("Enter User ID to update: ");
     scanf("%10s", id);
 
+    AcquireExclusiveLock(&LockManager[TABLE_USERS]);
+
     User *u = FindUserHash(id);
     if (u == NULL)
     {
         printf("❌ User not found.\n");
+        ReleaseLock(&LockManager[TABLE_USERS]);
         return;
     }
 
@@ -2981,7 +3180,7 @@ void UpdateUserUI()
         char buffer[ID_Len];
         printf("New Organization ID (or 'none' to clear): ");
         scanf("%10s", buffer);
-
+        AcquireSharedLock(&LockManager[TABLE_ORGANIZATIONS]);
         if (strcmp(buffer, "none") == 0)
         {
             u->ORG_ID[0] = '\0';
@@ -2999,6 +3198,7 @@ void UpdateUserUI()
             sprintf(details, "Organization changed from '%s' to '%s'", details, u->ORG_ID);
             CreateLog("Users", u->User_ID, "UPDATE", details);
         }
+        ReleaseLock(&LockManager[TABLE_ORGANIZATIONS]);
         break;
     }
 
@@ -3007,7 +3207,7 @@ void UpdateUserUI()
         char buffer[ID_Len];
         printf("New Role ID (or 'none' to clear): ");
         scanf("%10s", buffer);
-
+        AcquireSharedLock(&LockManager[TABLE_ROLES]);
         if (strcmp(buffer, "none") == 0)
         {
             u->ROLE_ID[0] = '\0';
@@ -3025,9 +3225,11 @@ void UpdateUserUI()
             sprintf(details, "Role changed from '%s' to '%s'", details, u->ROLE_ID);
             CreateLog("Users", u->User_ID, "UPDATE", details);
         }
+        ReleaseLock(&LockManager[TABLE_ROLES]);
         break;
     }
     }
+    ReleaseLock(&LockManager[TABLE_USERS]);
 }
 
 void DeleteUserUI()
@@ -3035,11 +3237,12 @@ void DeleteUserUI()
     char id[ID_Len];
     printf("Enter User ID to delete: ");
     scanf("%10s", id);
-
+    AcquireExclusiveLock(&LockManager[TABLE_USERS]);
     User *u = FindUserHash(id);
     if (u != NULL)
     {
         // Show what will be deleted
+        AcquireExclusiveLock(&LockManager[TABLE_VEHICLES]);
         int vehicleCount = 0;
         for (int i = 0; i < Table_Size; i++)
         {
@@ -3063,11 +3266,13 @@ void DeleteUserUI()
         DeleteUserHash(id);
         printf("✅ User deleted successfully.\n");
         CreateLog("Users", id, "DELETE", "User and associated vehicles deleted.");
+        ReleaseLock(&LockManager[TABLE_VEHICLES]);
     }
     else
     {
         printf("❌ User not found.\n");
     }
+    ReleaseLock(&LockManager[TABLE_USERS]);
 }
 
 void ClearInputBuffer()
@@ -3131,22 +3336,25 @@ void PrintVehicleUI()
     char plate[ID_Len];
     printf("Enter License Plate: ");
     scanf("%10s", plate);
-
+    AcquireSharedLock(&LockManager[TABLE_VEHICLES]);
     Vehicle *v = FindVehicleHash(plate);
     if (v == NULL)
     {
         printf("❌ Vehicle not found.\n");
+        ReleaseLock(&LockManager[TABLE_VEHICLES]);
         return;
     }
 
     printf("\n═══════ VEHICLE DETAILS ═══════\n");
     PrintVehicle(v);
-
+    AcquireSharedLock(&LockManager[TABLE_USERS]);
     User *owner = FindUserHash(v->USER_ID);
     if (owner != NULL)
     {
         printf("👤 Owner: %s %s (ID: %s)\n", owner->FirstName, owner->LastName, owner->User_ID);
     }
+    ReleaseLock(&LockManager[TABLE_USERS]);
+    ReleaseLock(&LockManager[TABLE_VEHICLES]);
 }
 
 void CreateVehicleUI()
@@ -3155,14 +3363,15 @@ void CreateVehicleUI()
 
     printf("Enter License Plate: ");
     scanf("%10s", v->License_Plate);
-
+    AcquireSharedLock(&LockManager[TABLE_VEHICLES]);
     if (FindVehicleHash(v->License_Plate) != NULL)
     {
         printf("❌ Error: Vehicle with this plate already exists!\n");
         free(v);
+        ReleaseLock(&LockManager[TABLE_VEHICLES]);
         return;
     }
-
+    ReleaseLock(&LockManager[TABLE_VEHICLES]);
     printf("Enter Make: ");
     scanf("%50s", v->Make);
     printf("Enter Model: ");
@@ -3181,17 +3390,27 @@ void CreateVehicleUI()
 
     printf("Enter Owner User ID: ");
     scanf("%10s", v->USER_ID);
-
+    AcquireSharedLock(&LockManager[TABLE_USERS]);
     if (FindUserHash(v->USER_ID) == NULL)
     {
         printf("❌ Error: User ID not found. Vehicle must have a valid owner.\n");
         free(v);
+        ReleaseLock(&LockManager[TABLE_USERS]);
         return;
     }
-
+    ReleaseLock(&LockManager[TABLE_USERS]);
+    AcquireExclusiveLock(&LockManager[TABLE_VEHICLES]);
+    if (FindVehicleHash(v->License_Plate) != NULL)
+    {
+        printf("❌ Error: Vehicle with this plate already exists! (It was taken while you were typing)\n");
+        free(v);
+        ReleaseLock(&LockManager[TABLE_VEHICLES]);
+        return;
+    }
     InsertVehicleHash(v);
     printf("✅ Vehicle added successfully.\n");
     CreateLog("Vehicles", v->License_Plate, "CREATE", "New vehicle created.");
+    ReleaseLock(&LockManager[TABLE_VEHICLES]);
 }
 
 void UpdateVehicleUI()
@@ -3199,11 +3418,12 @@ void UpdateVehicleUI()
     char plate[ID_Len];
     printf("Enter License Plate: ");
     scanf("%10s", plate);
-
+    AcquireExclusiveLock(&LockManager[TABLE_VEHICLES]);
     Vehicle *v = FindVehicleHash(plate);
     if (v == NULL)
     {
         printf("❌ Vehicle not found.\n");
+        ReleaseLock(&LockManager[TABLE_VEHICLES]);
         return;
     }
 
@@ -3268,17 +3488,22 @@ void UpdateVehicleUI()
         char newOwner[ID_Len];
         printf("New Owner User ID: ");
         scanf("%10s", newOwner);
+        AcquireSharedLock(&LockManager[TABLE_USERS]);
         if (FindUserHash(newOwner) == NULL)
         {
             printf("❌ User not found. Owner unchanged.\n");
+            ReleaseLock(&LockManager[TABLE_USERS]);
+            ReleaseLock(&LockManager[TABLE_VEHICLES]);
             return;
         }
         sprintf(details, "Owner changed from '%s' to '%s'", v->USER_ID, newOwner);
         strcpy(v->USER_ID, newOwner);
         CreateLog("Vehicles", v->License_Plate, "UPDATE", details);
+        ReleaseLock(&LockManager[TABLE_USERS]);
         break;
     }
     printf("✅ Updated successfully.\n");
+    ReleaseLock(&LockManager[TABLE_VEHICLES]);
 }
 
 void DeleteVehicleUI()
@@ -3286,7 +3511,7 @@ void DeleteVehicleUI()
     char plate[ID_Len];
     printf("Enter License Plate: ");
     scanf("%10s", plate);
-
+    AcquireExclusiveLock(&LockManager[TABLE_VEHICLES]);
     Vehicle *v = FindVehicleHash(plate);
     if (v != NULL)
     {
@@ -3298,6 +3523,7 @@ void DeleteVehicleUI()
     {
         printf("❌ Vehicle not found.\n");
     }
+    ReleaseLock(&LockManager[TABLE_VEHICLES]);
 }
 
 // ========== ROLES CRUD ==========
@@ -3354,16 +3580,19 @@ void PrintRoleUI()
     char id[ID_Len];
     printf("Enter Role ID: ");
     scanf("%10s", id);
+    AcquireSharedLock(&LockManager[TABLE_ROLES]);
 
     Role *r = FindRoleHash(id);
     if (r == NULL)
     {
         printf("❌ Role not found.\n");
+        ReleaseLock(&LockManager[TABLE_ROLES]);
         return;
     }
 
     printf("\n═══════ ROLE DETAILS ═══════\n");
     PrintRole(r);
+    ReleaseLock(&LockManager[TABLE_ROLES]);
 }
 
 void CreateRoleUI()
@@ -3372,14 +3601,15 @@ void CreateRoleUI()
 
     printf("Enter Role ID: ");
     scanf("%10s", r->Role_ID);
-
+    AcquireSharedLock(&LockManager[TABLE_ROLES]);
     if (FindRoleHash(r->Role_ID) != NULL)
     {
         printf("❌ Error: Role ID already exists!\n");
         free(r);
+        ReleaseLock(&LockManager[TABLE_ROLES]);
         return;
     }
-
+    ReleaseLock(&LockManager[TABLE_ROLES]);
     printf("Enter Role Name: ");
     scanf("%50s", r->RoleName);
 
@@ -3387,10 +3617,18 @@ void CreateRoleUI()
     printf("Enter Description (max 200 chars): ");
     fgets(r->RoleDescription, 201, stdin);
     r->RoleDescription[strcspn(r->RoleDescription, "\n")] = 0;
-
+    AcquireExclusiveLock(&LockManager[TABLE_ROLES]);
+    if (FindRoleHash(r->Role_ID) != NULL)
+    {
+        printf("❌ Error: Role ID already exists! (It was taken while you were typing)\n");
+        free(r);
+        ReleaseLock(&LockManager[TABLE_ROLES]);
+        return;
+    }
     InsertRoleHash(r);
     printf("✅ Role added successfully.\n");
     CreateLog("Roles", r->Role_ID, "CREATE", "New role created.");
+    ReleaseLock(&LockManager[TABLE_ROLES]);
 }
 
 void UpdateRoleUI()
@@ -3398,11 +3636,12 @@ void UpdateRoleUI()
     char id[ID_Len];
     printf("Enter Role ID: ");
     scanf("%10s", id);
-
+    AcquireExclusiveLock(&LockManager[TABLE_ROLES]);
     Role *r = FindRoleHash(id);
     if (r == NULL)
     {
         printf("❌ Role not found.\n");
+        ReleaseLock(&LockManager[TABLE_ROLES]);
         return;
     }
 
@@ -3436,6 +3675,7 @@ void UpdateRoleUI()
         CreateLog("Roles", r->Role_ID, "UPDATE", details);
     }
     printf("✅ Updated successfully.\n");
+    ReleaseLock(&LockManager[TABLE_ROLES]);
 }
 
 void DeleteRoleUI()
@@ -3443,19 +3683,24 @@ void DeleteRoleUI()
     char id[ID_Len];
     printf("Enter Role ID: ");
     scanf("%10s", id);
-
+    AcquireExclusiveLock(&LockManager[TABLE_ROLES]);
     Role *r = FindRoleHash(id);
     if (r != NULL)
     {
+        AcquireExclusiveLock(&LockManager[TABLE_USERS]);
+        AcquireExclusiveLock(&LockManager[TABLE_PERMISSIONS]);
         printf("⚠️  WARNING: Will clear user role assignments & permissions!\n");
         printf("🗑️  Deleting: %s\n", r->RoleName);
         DeleteRoleHash(id);
         printf("✅ Role deleted.\n");
+        ReleaseLock(&LockManager[TABLE_USERS]);
+        ReleaseLock(&LockManager[TABLE_PERMISSIONS]);
     }
     else
     {
         printf("❌ Role not found.\n");
     }
+    ReleaseLock(&LockManager[TABLE_ROLES]);
 }
 
 // ========== ORGANIZATIONS CRUD ==========
@@ -3512,17 +3757,18 @@ void PrintOrganizationUI()
     char id[ID_Len];
     printf("Enter Organization ID: ");
     scanf("%10s", id);
-
+    AcquireSharedLock(&LockManager[TABLE_ORGANIZATIONS]);
     Organization *o = FindOrganizationHash(id);
     if (o == NULL)
     {
         printf("❌ Organization not found.\n");
+        ReleaseLock(&LockManager[TABLE_ORGANIZATIONS]);
         return;
     }
 
     printf("\n═══════ ORGANIZATION DETAILS ═══════\n");
     PrintOrganization(o);
-
+    AcquireSharedLock(&LockManager[TABLE_ZONES]);
     if (o->ZONE_ID[0] != '\0')
     {
         Zone *z = FindZoneHash(o->ZONE_ID);
@@ -3531,6 +3777,8 @@ void PrintOrganizationUI()
             printf("📍 Zone: %s\n", z->ZoneName);
         }
     }
+    ReleaseLock(&LockManager[TABLE_ZONES]);
+    ReleaseLock(&LockManager[TABLE_ORGANIZATIONS]);
 }
 
 void CreateOrganizationUI()
@@ -3539,14 +3787,15 @@ void CreateOrganizationUI()
 
     printf("Enter Organization ID: ");
     scanf("%10s", o->Org_ID);
-
+    AcquireSharedLock(&LockManager[TABLE_ORGANIZATIONS]);
     if (FindOrganizationHash(o->Org_ID) != NULL)
     {
         printf("❌ Error: Organization ID exists!\n");
         free(o);
+        ReleaseLock(&LockManager[TABLE_ORGANIZATIONS]);
         return;
     }
-
+    ReleaseLock(&LockManager[TABLE_ORGANIZATIONS]);
     printf("Enter Name: ");
     scanf("%50s", o->OrgName);
     printf("Enter Type: ");
@@ -3555,7 +3804,7 @@ void CreateOrganizationUI()
     printf("Enter Zone ID (or 'none'): ");
     char zone[ID_Len];
     scanf("%10s", zone);
-
+    AcquireSharedLock(&LockManager[TABLE_ZONES]);
     if (strcmp(zone, "none") == 0)
     {
         o->ZONE_ID[0] = '\0';
@@ -3569,10 +3818,19 @@ void CreateOrganizationUI()
     {
         strcpy(o->ZONE_ID, zone);
     }
-
+    ReleaseLock(&LockManager[TABLE_ZONES]);
+    AcquireExclusiveLock(&LockManager[TABLE_ORGANIZATIONS]);
+    if (FindOrganizationHash(o->Org_ID) != NULL)
+    {
+        printf("❌ Error: Organization ID exists! (It was taken while you were typing)\n");
+        free(o);
+        ReleaseLock(&LockManager[TABLE_ORGANIZATIONS]);
+        return;
+    }
     InsertOrganizationHash(o);
     printf("✅ Organization added.\n");
     CreateLog("Organizations", o->Org_ID, "CREATE", "New organization created.");
+    ReleaseLock(&LockManager[TABLE_ORGANIZATIONS]);
 }
 
 void UpdateOrganizationUI()
@@ -3580,11 +3838,12 @@ void UpdateOrganizationUI()
     char id[ID_Len];
     printf("Enter Organization ID: ");
     scanf("%10s", id);
-
+    AcquireExclusiveLock(&LockManager[TABLE_ORGANIZATIONS]);
     Organization *o = FindOrganizationHash(id);
     if (o == NULL)
     {
         printf("❌ Organization not found.\n");
+        ReleaseLock(&LockManager[TABLE_ORGANIZATIONS]);
         return;
     }
 
@@ -3620,6 +3879,7 @@ void UpdateOrganizationUI()
         printf("New Zone ID (or 'none'): ");
         scanf("%10s", zone);
         strcpy(temp, o->ZONE_ID);
+        AcquireSharedLock(&LockManager[TABLE_ZONES]);
         if (strcmp(zone, "none") == 0)
         {
             o->ZONE_ID[0] = '\0';
@@ -3629,6 +3889,8 @@ void UpdateOrganizationUI()
         else if (FindZoneHash(zone) == NULL)
         {
             printf("❌ Zone not found. Unchanged.\n");
+            ReleaseLock(&LockManager[TABLE_ZONES]);
+            ReleaseLock(&LockManager[TABLE_ORGANIZATIONS]);
             return;
         }
         else
@@ -3637,9 +3899,12 @@ void UpdateOrganizationUI()
             sprintf(details, "Organization Zone changed from '%s' to '%s'", temp, o->ZONE_ID);
             CreateLog("Organizations", o->Org_ID, "UPDATE", details);
         }
+        ReleaseLock(&LockManager[TABLE_ZONES]);
         break;
     }
     printf("✅ Updated successfully.\n");
+
+    ReleaseLock(&LockManager[TABLE_ORGANIZATIONS]);
 }
 
 void DeleteOrganizationUI()
@@ -3647,19 +3912,22 @@ void DeleteOrganizationUI()
     char id[ID_Len];
     printf("Enter Organization ID: ");
     scanf("%10s", id);
-
+    AcquireExclusiveLock(&LockManager[TABLE_ORGANIZATIONS]);
     Organization *o = FindOrganizationHash(id);
     if (o != NULL)
     {
+        AcquireExclusiveLock(&LockManager[TABLE_USERS]);
         printf("⚠️  Will clear user org assignments!\n");
         printf("🗑️  Deleting: %s\n", o->OrgName);
         DeleteOrganizationHash(id);
         printf("✅ Organization deleted.\n");
+        ReleaseLock(&LockManager[TABLE_USERS]);
     }
     else
     {
         printf("❌ Organization not found.\n");
     }
+    ReleaseLock(&LockManager[TABLE_ORGANIZATIONS]);
 }
 
 // ========== ZONES CRUD ==========
@@ -3716,16 +3984,18 @@ void PrintZoneUI()
     char id[ID_Len];
     printf("Enter Zone ID: ");
     scanf("%10s", id);
-
+    AcquireSharedLock(&LockManager[TABLE_ZONES]);
     Zone *z = FindZoneHash(id);
     if (z == NULL)
     {
         printf("❌ Zone not found.\n");
+        ReleaseLock(&LockManager[TABLE_ZONES]);
         return;
     }
 
     printf("\n═══════ ZONE DETAILS ═══════\n");
     PrintZone(z);
+    ReleaseLock(&LockManager[TABLE_ZONES]);
 }
 
 void CreateZoneUI()
@@ -3734,20 +4004,30 @@ void CreateZoneUI()
 
     printf("Enter Zone ID: ");
     scanf("%10s", z->Zone_ID);
-
+    AcquireSharedLock(&LockManager[TABLE_ZONES]);
     if (FindZoneHash(z->Zone_ID) != NULL)
     {
         printf("❌ Error: Zone ID exists!\n");
         free(z);
+        ReleaseLock(&LockManager[TABLE_ZONES]);
         return;
     }
-
+    ReleaseLock(&LockManager[TABLE_ZONES]);
     printf("Enter Zone Name: ");
     scanf("%50s", z->ZoneName);
 
+    AcquireExclusiveLock(&LockManager[TABLE_ZONES]);
+    if (FindZoneHash(z->Zone_ID) != NULL)
+    {
+        printf("❌ Error: Zone ID exists! (It was taken while you were typing)\n");
+        free(z);
+        ReleaseLock(&LockManager[TABLE_ZONES]);
+        return;
+    }
     InsertZoneHash(z);
     printf("✅ Zone added.\n");
     CreateLog("Zones", z->Zone_ID, "CREATE", "New zone created.");
+    ReleaseLock(&LockManager[TABLE_ZONES]);
 }
 
 void UpdateZoneUI()
@@ -3755,11 +4035,12 @@ void UpdateZoneUI()
     char id[ID_Len];
     printf("Enter Zone ID: ");
     scanf("%10s", id);
-
+    AcquireExclusiveLock(&LockManager[TABLE_ZONES]);
     Zone *z = FindZoneHash(id);
     if (z == NULL)
     {
         printf("❌ Zone not found.\n");
+        ReleaseLock(&LockManager[TABLE_ZONES]);
         return;
     }
 
@@ -3772,6 +4053,7 @@ void UpdateZoneUI()
     char details[Buffer_Size];
     sprintf(details, "Zone Name changed from '%s' to '%s'", temp, z->ZoneName);
     CreateLog("Zones", z->Zone_ID, "UPDATE", details);
+    ReleaseLock(&LockManager[TABLE_ZONES]);
 }
 
 void DeleteZoneUI()
@@ -3779,19 +4061,26 @@ void DeleteZoneUI()
     char id[ID_Len];
     printf("Enter Zone ID: ");
     scanf("%10s", id);
-
+    AcquireExclusiveLock(&LockManager[TABLE_ZONES]);
     Zone *z = FindZoneHash(id);
     if (z != NULL)
     {
+        AcquireExclusiveLock(&LockManager[TABLE_ORGANIZATIONS]);
+        AcquireExclusiveLock(&LockManager[TABLE_PERMISSIONS]);
+        AcquireExclusiveLock(&LockManager[TABLE_GATE_ZONES]);
         printf("⚠️  Will delete gate links & permissions!\n");
         printf("🗑️  Deleting: %s\n", z->ZoneName);
         DeleteZoneHash(id);
         printf("✅ Zone deleted.\n");
+        ReleaseLock(&LockManager[TABLE_ORGANIZATIONS]);
+        ReleaseLock(&LockManager[TABLE_PERMISSIONS]);
+        ReleaseLock(&LockManager[TABLE_GATE_ZONES]);
     }
     else
     {
         printf("❌ Zone not found.\n");
     }
+    ReleaseLock(&LockManager[TABLE_ZONES]);
 }
 
 // ========== GATES CRUD ==========
@@ -3848,16 +4137,19 @@ void PrintGateUI()
     char id[ID_Len];
     printf("Enter Gate ID: ");
     scanf("%10s", id);
+    AcquireSharedLock(&LockManager[TABLE_GATES]);
 
     Gate *g = FindGateHash(id);
     if (g == NULL)
     {
         printf("❌ Gate not found.\n");
+        ReleaseLock(&LockManager[TABLE_GATES]);
         return;
     }
 
     printf("\n═══════ GATE DETAILS ═══════\n");
     PrintGate(g);
+    ReleaseLock(&LockManager[TABLE_GATES]);
 }
 
 void CreateGateUI()
@@ -3866,14 +4158,15 @@ void CreateGateUI()
 
     printf("Enter Gate ID: ");
     scanf("%10s", g->Gate_ID);
-
+    AcquireSharedLock(&LockManager[TABLE_GATES]);
     if (FindGateHash(g->Gate_ID) != NULL)
     {
         printf("❌ Error: Gate ID exists!\n");
         free(g);
+        ReleaseLock(&LockManager[TABLE_GATES]);
         return;
     }
-
+    ReleaseLock(&LockManager[TABLE_GATES]);
     printf("Enter Gate Name: ");
     scanf("%50s", g->gateName);
 
@@ -3885,10 +4178,18 @@ void CreateGateUI()
         printf("Invalid. Enter 0-2: ");
     }
     g->gateStatus = (GateStatus)s;
-
+    AcquireExclusiveLock(&LockManager[TABLE_GATES]);
+    if (FindGateHash(g->Gate_ID) != NULL)
+    {
+        printf("❌ Error: Gate ID exists! (It was taken while you were typing)\n");
+        free(g);
+        ReleaseLock(&LockManager[TABLE_GATES]);
+        return;
+    }
     InsertGateHash(g);
     printf("✅ Gate added.\n");
     CreateLog("Gates", g->Gate_ID, "CREATE", "New gate created.");
+    ReleaseLock(&LockManager[TABLE_GATES]);
 }
 
 void UpdateGateUI()
@@ -3896,11 +4197,12 @@ void UpdateGateUI()
     char id[ID_Len];
     printf("Enter Gate ID: ");
     scanf("%10s", id);
-
+    AcquireExclusiveLock(&LockManager[TABLE_GATES]);
     Gate *g = FindGateHash(id);
     if (g == NULL)
     {
         printf("❌ Gate not found.\n");
+        ReleaseLock(&LockManager[TABLE_GATES]);
         return;
     }
 
@@ -3938,6 +4240,7 @@ void UpdateGateUI()
         CreateLog("Gates", g->Gate_ID, "UPDATE", details);
     }
     printf("✅ Updated.\n");
+    ReleaseLock(&LockManager[TABLE_GATES]);
 }
 
 void DeleteGateUI()
@@ -3945,19 +4248,22 @@ void DeleteGateUI()
     char id[ID_Len];
     printf("Enter Gate ID: ");
     scanf("%10s", id);
-
+    AcquireExclusiveLock(&LockManager[TABLE_GATES]);
     Gate *g = FindGateHash(id);
     if (g != NULL)
     {
+        AcquireExclusiveLock(&LockManager[TABLE_GATE_ZONES]);
         printf("⚠️  Will delete gate-zone links!\n");
         printf("🗑️  Deleting: %s\n", g->gateName);
         DeleteGateHash(id);
         printf("✅ Gate deleted.\n");
+        ReleaseLock(&LockManager[TABLE_GATE_ZONES]);
     }
     else
     {
         printf("❌ Gate not found.\n");
     }
+    ReleaseLock(&LockManager[TABLE_GATES]);
 }
 
 // ========== PERMISSIONS CRUD ==========
@@ -3973,6 +4279,7 @@ void PrintAllPermissions()
 {
     printf("\n═══════ ALL PERMISSIONS ═══════\n");
     int count = 0;
+    AcquireSharedLock(&LockManager[TABLE_PERMISSIONS]);
     for (int i = 0; i < Table_Size; i++)
     {
         Node *temp = PermissionsTable->buckets[i]->head;
@@ -3986,6 +4293,7 @@ void PrintAllPermissions()
         }
     }
     printf("Total: %d permissions\n", count);
+    ReleaseLock(&LockManager[TABLE_PERMISSIONS]);
 }
 
 bool isValidTime(char *time)
@@ -4059,16 +4367,19 @@ void PrintPermissionUI()
     scanf("%10s", roleID);
     printf("Enter Zone ID: ");
     scanf("%10s", zoneID);
+    AcquireSharedLock(&LockManager[TABLE_PERMISSIONS]);
 
     Permissions *p = FindPermission(roleID, zoneID);
     if (p == NULL)
     {
         printf("❌ Permission not found.\n");
+        ReleaseLock(&LockManager[TABLE_PERMISSIONS]);
         return;
     }
 
     printf("\n═══════ PERMISSION DETAILS ═══════\n");
     PrintPermission(p);
+    ReleaseLock(&LockManager[TABLE_PERMISSIONS]);
 }
 
 void CreatePermissionUI()
@@ -4077,31 +4388,35 @@ void CreatePermissionUI()
 
     printf("Enter Role ID: ");
     scanf("%10s", p->Role_ID);
-
+    AcquireSharedLock(&LockManager[TABLE_ROLES]);
     if (FindRoleHash(p->Role_ID) == NULL)
     {
         printf("❌ Error: Role not found.\n");
         free(p);
+        ReleaseLock(&LockManager[TABLE_ROLES]);
         return;
     }
-
+    ReleaseLock(&LockManager[TABLE_ROLES]);
     printf("Enter Zone ID: ");
     scanf("%10s", p->ZONE_ID);
-
+    AcquireSharedLock(&LockManager[TABLE_ZONES]);
     if (FindZoneHash(p->ZONE_ID) == NULL)
     {
         printf("❌ Error: Zone not found.\n");
         free(p);
+        ReleaseLock(&LockManager[TABLE_ZONES]);
         return;
     }
-
+    ReleaseLock(&LockManager[TABLE_ZONES]);
+    AcquireSharedLock(&LockManager[TABLE_PERMISSIONS]);
     if (FindPermission(p->Role_ID, p->ZONE_ID) != NULL)
     {
         printf("❌ Error: Permission already exists!\n");
         free(p);
+        ReleaseLock(&LockManager[TABLE_PERMISSIONS]);
         return;
     }
-
+    ReleaseLock(&LockManager[TABLE_PERMISSIONS]);
     printf("Enter Allowed Days ('MonTueWed' ): ");
     scanf("%50s", p->AllowedDays);
 
@@ -4122,6 +4437,14 @@ void CreatePermissionUI()
         printf("❌ Invalid time format. Use HH:MM (e.g., 17:00): ");
         scanf("%5s", p->EndTime);
     }
+    AcquireExclusiveLock(&LockManager[TABLE_PERMISSIONS]);
+    if (FindPermission(p->Role_ID, p->ZONE_ID) != NULL)
+    {
+        printf("❌ Error: Permission already exists! (It was created while you were typing)\n");
+        free(p);
+        ReleaseLock(&LockManager[TABLE_PERMISSIONS]);
+        return;
+    }
 
     InsertPermissionHash(p);
     printf("✅ Permission added successfully.\n");
@@ -4130,6 +4453,7 @@ void CreatePermissionUI()
     strcat(comPri, "-");
     strcat(comPri, p->ZONE_ID);
     CreateLog("Permissions", comPri, "CREATE", "New permission created.");
+    ReleaseLock(&LockManager[TABLE_PERMISSIONS]);
 }
 
 void DeletePermissionUI()
@@ -4141,11 +4465,12 @@ void DeletePermissionUI()
     scanf("%10s", roleID);
     printf("Enter Zone ID: ");
     scanf("%10s", zoneID);
-
+    AcquireExclusiveLock(&LockManager[TABLE_PERMISSIONS]);
     Permissions *p = FindPermission(roleID, zoneID);
     if (p == NULL)
     {
         printf("❌ Permission not found.\n");
+        ReleaseLock(&LockManager[TABLE_PERMISSIONS]);
         return;
     }
 
@@ -4159,12 +4484,20 @@ void DeletePermissionUI()
         Permissions *perm = (Permissions *)current->data;
         if (!strcmp(perm->Role_ID, roleID) && !strcmp(perm->ZONE_ID, zoneID))
         {
+            char comPri[30];
+            strcpy(comPri, perm->Role_ID);
+            strcat(comPri, "-");
+            strcat(comPri, perm->ZONE_ID);
+            CreateLog("Permissions", comPri, "DELETE", "Permission deleted.");
+
             Delete(PermissionsTable->buckets[index], current);
             printf("✅ Permission deleted.\n");
+            ReleaseLock(&LockManager[TABLE_PERMISSIONS]);
             return;
         }
         current = current->next;
     }
+    ReleaseLock(&LockManager[TABLE_PERMISSIONS]);
 }
 
 // ========== GATE-ZONE LINKS MANAGEMENT ==========
@@ -4186,6 +4519,7 @@ void PrintAllGateZones()
 {
     printf("\n═══════ ALL GATE-ZONE LINKS ═══════\n");
     int count = 0;
+    AcquireSharedLock(&LockManager[TABLE_GATE_ZONES]);
     for (int i = 0; i < Table_Size; i++)
     {
         Node *temp = Gate_ZoneTable->buckets[i]->head;
@@ -4198,6 +4532,7 @@ void PrintAllGateZones()
         }
     }
     printf("Total: %d links\n", count);
+    ReleaseLock(&LockManager[TABLE_GATE_ZONES]);
 }
 
 void ManageGateZonesMenu()
@@ -4242,6 +4577,8 @@ void ManageGateZonesMenu()
 
             printf("\n═══ Gates accessing Zone %s ═══\n", zoneID);
             int found = 0;
+            AcquireSharedLock(&LockManager[TABLE_GATE_ZONES]);
+            AcquireSharedLock(&LockManager[TABLE_GATES]);
             for (int i = 0; i < Table_Size; i++)
             {
                 Node *temp = Gate_ZoneTable->buckets[i]->head;
@@ -4262,6 +4599,8 @@ void ManageGateZonesMenu()
             }
             if (!found)
                 printf("  No gates linked to this zone.\n");
+            ReleaseLock(&LockManager[TABLE_GATES]);
+            ReleaseLock(&LockManager[TABLE_GATE_ZONES]);
             break;
         }
         case 5:
@@ -4274,6 +4613,8 @@ void ManageGateZonesMenu()
             DLL *bucket = GetGateZoneBucket(gateID);
             Node *temp = bucket->head;
             int found = 0;
+            AcquireSharedLock(&LockManager[TABLE_GATE_ZONES]);
+            AcquireSharedLock(&LockManager[TABLE_ZONES]);
             while (temp != NULL)
             {
                 Gate_Zone *gz = (Gate_Zone *)temp->data;
@@ -4290,6 +4631,8 @@ void ManageGateZonesMenu()
             }
             if (!found)
                 printf("  No zones linked to this gate.\n");
+            ReleaseLock(&LockManager[TABLE_ZONES]);
+            ReleaseLock(&LockManager[TABLE_GATE_ZONES]);
             break;
         }
         case 6:
@@ -4306,31 +4649,34 @@ void CreateGateZoneUI()
 
     printf("Enter Gate ID: ");
     scanf("%10s", gz->GATE_ID);
-
+    AcquireSharedLock(&LockManager[TABLE_GATES]);
     if (FindGateHash(gz->GATE_ID) == NULL)
     {
         printf("❌ Error: Gate not found.\n");
         free(gz);
+        ReleaseLock(&LockManager[TABLE_GATES]);
         return;
     }
-
+    ReleaseLock(&LockManager[TABLE_GATES]);
     printf("Enter Zone ID: ");
     scanf("%10s", gz->ZONE_ID);
-
+    AcquireSharedLock(&LockManager[TABLE_ZONES]);
     if (FindZoneHash(gz->ZONE_ID) == NULL)
     {
         printf("❌ Error: Zone not found.\n");
         free(gz);
+        ReleaseLock(&LockManager[TABLE_ZONES]);
         return;
     }
-
+    ReleaseLock(&LockManager[TABLE_ZONES]);
+    AcquireExclusiveLock(&LockManager[TABLE_GATE_ZONES]);
     if (FindGateZoneLink(gz->GATE_ID, gz->ZONE_ID) != NULL)
     {
-        printf("❌ Error: Link already exists!\n");
+        printf("❌ Error: Link already exists! (It was created while you were typing)\n");
         free(gz);
+        ReleaseLock(&LockManager[TABLE_GATE_ZONES]);
         return;
     }
-
     InsertGate_ZoneHash(gz);
     printf("✅ Gate-Zone link created successfully.\n");
     char comPri[30];
@@ -4338,13 +4684,17 @@ void CreateGateZoneUI()
     strcat(comPri, "-");
     strcat(comPri, gz->ZONE_ID);
     CreateLog("Gate_Zone", comPri, "CREATE", "New gate-zone link created.");
-
+    ReleaseLock(&LockManager[TABLE_GATE_ZONES]);
+    AcquireSharedLock(&LockManager[TABLE_GATES]);
+    AcquireSharedLock(&LockManager[TABLE_ZONES]);
     Gate *g = FindGateHash(gz->GATE_ID);
     Zone *z = FindZoneHash(gz->ZONE_ID);
     if (g && z)
     {
         printf("   🚪 %s now accesses 📍 %s\n", g->gateName, z->ZoneName);
     }
+    ReleaseLock(&LockManager[TABLE_ZONES]);
+    ReleaseLock(&LockManager[TABLE_GATES]);
 }
 
 void DeleteGateZoneUI()
@@ -4356,11 +4706,12 @@ void DeleteGateZoneUI()
     scanf("%10s", gateID);
     printf("Enter Zone ID: ");
     scanf("%10s", zoneID);
-
+    AcquireExclusiveLock(&LockManager[TABLE_GATE_ZONES]);
     Gate_Zone *gz = FindGateZoneLink(gateID, zoneID);
     if (gz == NULL)
     {
         printf("❌ Link not found.\n");
+        ReleaseLock(&LockManager[TABLE_GATE_ZONES]);
         return;
     }
 
@@ -4373,10 +4724,126 @@ void DeleteGateZoneUI()
         Gate_Zone *link = (Gate_Zone *)current->data;
         if (!strcmp(link->GATE_ID, gateID) && !strcmp(link->ZONE_ID, zoneID))
         {
+            char comPri[30];
+            strcpy(comPri, link->GATE_ID);
+            strcat(comPri, "-");
+            strcat(comPri, link->ZONE_ID);
+            CreateLog("Gate_Zone", comPri, "DELETE", "Gate-Zone Link deleted.");
+
             Delete(Gate_ZoneTable->buckets[index], current);
             printf("✅ Gate-Zone link deleted.\n");
+            ReleaseLock(&LockManager[TABLE_GATE_ZONES]);
             return;
         }
         current = current->next;
     }
+    ReleaseLock(&LockManager[TABLE_GATE_ZONES]);
+}
+
+// --- CONCURRENCY SIMULATION (REAL DB INTERACTION) ---
+
+// The "Writer" (Simulates an Admin creating a user)
+void *WriterTask(void *arg)
+{
+    printf("\n   [Writer] Requesting Exclusive Lock on USERS...\n");
+
+    User *u = *(User **)arg;
+
+    // 2. LOCK (Exclusive)
+    AcquireExclusiveLock(&LockManager[TABLE_USERS]);
+
+    printf("   [Writer] >> LOCKED (Exclusive). Inserting User 'SIM_ADMIN'...\n");
+
+    if (FindUserHash("SIM_ADMIN") == NULL)
+    {
+        InsertUserHash(u);
+        CreateLog("Users", u->User_ID, "CREATE", "Simulated user created.");
+        printf("   [Writer] Insert Successful.\n");
+    }
+    else
+    {
+        printf("   [Writer] User already exists (Skipping insert).\n");
+        free(u);
+    }
+
+    printf("   [Writer] Updating User Information...\n");
+    for (int i = 0; i < 300; i++)
+    {
+        u = FindUserHash("SIM_ADMIN");
+        char newPhone[11];
+        if (u)
+        {
+            strcpy(newPhone, u->PhoneNum);
+            // Modify phone number slightly
+            newPhone[9] = '0' + (i % 10);
+            char details[Buffer_Size];
+            sprintf(details, "Phone number changed from '%s' to '%s'", u->PhoneNum, newPhone);
+            CreateLog("Users", u->User_ID, "UPDATE", details);
+            strcpy(u->PhoneNum, newPhone);
+        }
+    }
+    sleep(2);
+    printf("   [Writer] Done. Releasing Lock.\n");
+    ReleaseLock(&LockManager[TABLE_USERS]);
+    return NULL;
+}
+
+// The "Reader" (Simulates a Guard checking the user the Writer just made)
+void *ReaderTask(void *arg)
+{
+    // Pass the thread ID just for display purposes
+    int id = *(int *)arg;
+
+    printf("       [Reader %d] Requesting Shared Lock on USERS...\n", id);
+
+    AcquireSharedLock(&LockManager[TABLE_USERS]);
+
+    printf("       [Reader %d] >> LOCKED (Shared). Searching for 'SIM_ADMIN'...\n", id);
+
+    User *found = FindUserHash("SIM_ADMIN");
+
+    if (found != NULL)
+    {
+        printf("       [Reader %d] SUCCESS: Found User PhoneNum %s\n", id, found->PhoneNum);
+    }
+    else
+    {
+        printf("       [Reader %d] FAILED: User not found (Writer failed?).\n", id);
+    }
+
+    sleep(1);
+
+    printf("       [Reader %d] Done. Releasing Lock.\n", id);
+    ReleaseLock(&LockManager[TABLE_USERS]);
+    return NULL;
+}
+
+void SimulateConcurrency()
+{
+    pthread_t t1, t2, t3;
+    int id1 = 1, id2 = 2;
+
+    printf("\n=== CONCURRENCY SIMULATION START ===\n");
+    printf("(Writer will insert 'SIM_ADMIN' and Update Phone Number. Readers will try to find it.)\n");
+
+    User *u = calloc(1, sizeof(User));
+    strcpy(u->User_ID, "SIM_ADMIN");
+    strcpy(u->FirstName, "Simulation");
+    strcpy(u->LastName, "TestUser");
+    strcpy(u->Email, "sim@test.com");
+    strcpy(u->PhoneNum, "0123456789");
+    u->Status = 0;
+
+    pthread_create(&t1, NULL, WriterTask, &u);
+
+    usleep(100000);
+
+    pthread_create(&t2, NULL, ReaderTask, &id1);
+    pthread_create(&t3, NULL, ReaderTask, &id2);
+
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
+    pthread_join(t3, NULL);
+
+    printf("=== CONCURRENCY SIMULATION END ===\n");
 }
